@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  creationTimestamp: null
+  name: mcg-osd-deployer-leader-election-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: mcg-osd-deployer-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: mcg-osd-deployer-controller-manager
+  namespace: mcg-osd-deployer-system

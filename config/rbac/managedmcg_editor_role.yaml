@@ -1,0 +1,24 @@
+# permissions for end users to edit managedmcg.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: managedmcg-editor-role
+rules:
+- apiGroups:
+  - mcg.openshift.io
+  resources:
+  - managedmcg
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - mcg.openshift.io
+  resources:
+  - managedmcg/status
+  verbs:
+  - get

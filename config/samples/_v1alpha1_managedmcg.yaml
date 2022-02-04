@@ -1,0 +1,6 @@
+apiVersion: mcg.openshift.io/v1alpha1
+kind: ManagedMCG
+metadata:
+  name: managedmcg-sample
+spec:
+  # TODO(user): Add fields here

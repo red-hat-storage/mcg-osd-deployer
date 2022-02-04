@@ -1,0 +1,18 @@
+domain: mcg.openshift.io
+layout:
+- go.kubebuilder.io/v3
+plugins:
+  manifests.sdk.operatorframework.io/v2: {}
+  scorecard.sdk.operatorframework.io/v2: {}
+projectName: mcg-osd-deployer
+repo: github.com/red-hat-storage/mcg-osd-deployer
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: mcg.openshift.io
+  kind: ManagedMCG
+  path: github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1
+  version: v1alpha1
+version: "3"

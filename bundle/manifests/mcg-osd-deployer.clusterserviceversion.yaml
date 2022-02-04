@@ -1,0 +1,250 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "mcg.openshift.io/v1alpha1",
+          "kind": "ManagedMCG",
+          "metadata": {
+            "name": "managedmcg-sample"
+          },
+          "spec": null
+        }
+      ]
+    capabilities: Basic Install
+    olm.skipRange: '>=0.0.1 <1.1.3'
+    operators.operatorframework.io/builder: operator-sdk-v1.15.0+git
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+  name: mcg-osd-deployer.v1.1.3
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: ManagedMCG is the Schema for the managedmcgs API
+      displayName: Managed MCG
+      kind: ManagedMCG
+      name: managedmcgs.mcg.openshift.io
+      version: v1alpha1
+  description: Installs and Managed the lifecycle of an OpenShift Container Storage
+    (MCG) instance on an OpenShift dedicated cluster
+  displayName: MCG OSD Deployer
+  icon:
+  - base64data: PHN2ZyBpZD0iTGF5ZXJfMSIgZGF0YS1uYW1lPSJMYXllciAxIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTIgMTQ1Ij48ZGVmcz48c3R5bGU+LmNscy0xe2ZpbGw6I2UwMDt9PC9zdHlsZT48L2RlZnM+PHRpdGxlPlJlZEhhdC1Mb2dvLUhhdC1Db2xvcjwvdGl0bGU+PHBhdGggZD0iTTE1Ny43Nyw2Mi42MWExNCwxNCwwLDAsMSwuMzEsMy40MmMwLDE0Ljg4LTE4LjEsMTcuNDYtMzAuNjEsMTcuNDZDNzguODMsODMuNDksNDIuNTMsNTMuMjYsNDIuNTMsNDRhNi40Myw2LjQzLDAsMCwxLC4yMi0xLjk0bC0zLjY2LDkuMDZhMTguNDUsMTguNDUsMCwwLDAtMS41MSw3LjMzYzAsMTguMTEsNDEsNDUuNDgsODcuNzQsNDUuNDgsMjAuNjksMCwzNi40My03Ljc2LDM2LjQzLTIxLjc3LDAtMS4wOCwwLTEuOTQtMS43My0xMC4xM1oiLz48cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xMjcuNDcsODMuNDljMTIuNTEsMCwzMC42MS0yLjU4LDMwLjYxLTE3LjQ2YTE0LDE0LDAsMCwwLS4zMS0zLjQybC03LjQ1LTMyLjM2Yy0xLjcyLTcuMTItMy4yMy0xMC4zNS0xNS43My0xNi42QzEyNC44OSw4LjY5LDEwMy43Ni41LDk3LjUxLjUsOTEuNjkuNSw5MCw4LDgzLjA2LDhjLTYuNjgsMC0xMS42NC01LjYtMTcuODktNS42LTYsMC05LjkxLDQuMDktMTIuOTMsMTIuNSwwLDAtOC40MSwyMy43Mi05LjQ5LDI3LjE2QTYuNDMsNi40MywwLDAsMCw0Mi41Myw0NGMwLDkuMjIsMzYuMywzOS40NSw4NC45NCwzOS40NU0xNjAsNzIuMDdjMS43Myw4LjE5LDEuNzMsOS4wNSwxLjczLDEwLjEzLDAsMTQtMTUuNzQsMjEuNzctMzYuNDMsMjEuNzdDNzguNTQsMTA0LDM3LjU4LDc2LjYsMzcuNTgsNTguNDlhMTguNDUsMTguNDUsMCwwLDEsMS41MS03LjMzQzIyLjI3LDUyLC41LDU1LC41LDc0LjIyYzAsMzEuNDgsNzQuNTksNzAuMjgsMTMzLjY1LDcwLjI4LDQ1LjI4LDAsNTYuNy0yMC40OCw1Ni43LTM2LjY1LDAtMTIuNzItMTEtMjcuMTYtMzAuODMtMzUuNzgiLz48L3N2Zz4=
+    mediatype: image/svg+xml
+  install:
+    spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - mcg.openshift.io
+          resources:
+          - managedmcg
+          - managedmcg/finalizers
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - mcg.openshift.io
+          resources:
+          - managedmcg/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - mcg.openshift.io
+          resources:
+          - managedmcgs
+          - managedmcgs/finalizers
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - mcg.openshift.io
+          resources:
+          - managedmcgs/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - storage.k8s.io
+          resources:
+          - storageclass
+          verbs:
+          - get
+          - list
+          - watch
+        serviceAccountName: deployer
+      deployments:
+      - name: mcg-osd-deployer-controller-manager
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              control-plane: controller-manager
+          strategy: {}
+          template:
+            metadata:
+              labels:
+                control-plane: controller-manager
+            spec:
+              containers:
+              - args:
+                - --secure-listen-address=0.0.0.0:8443
+                - --upstream=http://127.0.0.1:8080/
+                - --logtostderr=true
+                - --v=10
+                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+                name: kube-rbac-proxy
+                ports:
+                - containerPort: 8443
+                  name: https
+                  protocol: TCP
+                resources: {}
+              - args:
+                - --metrics-bind-address=127.0.0.1:8080
+                - --leader-elect
+                command:
+                - /manager
+                env:
+                - name: NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: ADDON_NAME
+                  value: ocs-converged
+                - name: SOP_ENDPOINT
+                - name: ALERT_SMTP_FROM_ADDR
+                  value: noreply-test@rhmw.io
+                - name: DEPLOYMENT_TYPE
+                  value: converged
+                image: quay.io/napaul/mcg-osd-deployer:v1.3
+                name: manager
+                resources:
+                  limits:
+                    cpu: 100m
+                    memory: 200Mi
+                  requests:
+                    cpu: 100m
+                    memory: 200Mi
+              - command:
+                - /readinessServer
+                env:
+                - name: NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                image: quay.io/napaul/mcg-osd-deployer:v1.3
+                name: readiness-server
+                readinessProbe:
+                  httpGet:
+                    path: /readyz
+                    port: 8081
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+                resources:
+                  limits:
+                    cpu: 100m
+                    memory: 30Mi
+                  requests:
+                    cpu: 100m
+                    memory: 30Mi
+              serviceAccountName: deployer
+              terminationGracePeriodSeconds: 10
+      permissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          - secrets
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - statefulsets
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - ocs.openshift.io
+          resources:
+          - storageclusters
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - operators.coreos.com
+          resources:
+          - clusterserviceversions
+          verbs:
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        serviceAccountName: deployer
+    strategy: deployment
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: true
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: false
+    type: AllNamespaces
+  keywords:
+  - OpenShift
+  - OCS
+  - ODF
+  - OSD
+  - Storage
+  - MCG
+  links:
+  - name: OCS OSD Deployer
+    url: https://github.com/red-hat-storage/mcg-osd-deployer
+  maintainers:
+  - email: omitrani@redhat.com
+    name: Ohad Mitrani
+  maturity: alpha
+  provider:
+    name: Red Hat
+  replaces: mcg-osd-deployer.v1.1.2
+  version: 1.1.3
