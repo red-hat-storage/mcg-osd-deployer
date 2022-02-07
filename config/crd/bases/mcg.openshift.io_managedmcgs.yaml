@@ -46,13 +46,6 @@ spec:
             properties:
               components:
                 properties:
-                  StorageCluster:
-                    properties:
-                      state:
-                        type: string
-                    required:
-                    - state
-                    type: object
                   alertmanager:
                     properties:
                       state:
@@ -60,8 +53,15 @@ spec:
                     required:
                     - state
                     type: object
+                  noobaa:
+                    description: StorageCluster ComponentStatus `json:"StorageCluster"`
+                    properties:
+                      state:
+                        type: string
+                    required:
+                    - state
+                    type: object
                   prometheus:
-                    description: Noobaa       ComponentStatus `json:"noobaa"`
                     properties:
                       state:
                         type: string
@@ -69,8 +69,8 @@ spec:
                     - state
                     type: object
                 required:
-                - StorageCluster
                 - alertmanager
+                - noobaa
                 - prometheus
                 type: object
               reconcileStrategy:

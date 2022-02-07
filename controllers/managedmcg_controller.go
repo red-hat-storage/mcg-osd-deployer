@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+	noobaa "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	odfv1alpha1 "github.com/red-hat-data-services/odf-operator/api/v1alpha1"
 	mcgv1alpha1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
@@ -47,6 +48,8 @@ const (
 
 	StorageClusterName              = "ocs-storagecluster"
 	odfOperatorManagerconfigMapName = "odf-operator-manager-config"
+	noobaaName                      = "noobaa"
+	storageSystemName               = "ocs-storagecluster-storagesystem"
 )
 
 // ManagedMCGReconciler reconciles a ManagedMCG object
@@ -61,8 +64,9 @@ type ManagedMCGReconciler struct {
 	reconcileStrategy  mcgv1alpha1.ReconcileStrategy
 
 	storageCluster              *ocsv1.StorageCluster
-	StorageSystem               *odfv1alpha1.StorageSystem
 	odfOperatorManagerconfigMap *corev1.ConfigMap
+	noobaa                      *noobaa.NooBaa
+	storageSystem               *odfv1alpha1.StorageSystem
 }
 
 func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
@@ -81,6 +85,14 @@ func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
 	r.odfOperatorManagerconfigMap.Name = odfOperatorManagerconfigMapName
 	r.odfOperatorManagerconfigMap.Namespace = r.namespace
 
+	r.noobaa = &noobaa.NooBaa{}
+	r.noobaa.Name = noobaaName
+	r.noobaa.Namespace = r.namespace
+
+	r.storageSystem = &odfv1alpha1.StorageSystem{}
+	r.storageSystem.Name = storageSystemName
+	r.storageSystem.Namespace = r.namespace
+
 }
 
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources={managedmcg,managedmcg/finalizers},verbs=get;list;watch;create;update;patch;delete
@@ -91,6 +103,8 @@ func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
 // +kubebuilder:rbac:groups="coordination.k8s.io",namespace=system,resources=leases,verbs=create;get;list;watch;update
 // +kubebuilder:rbac:groups=operators.coreos.com,namespace=system,resources=clusterserviceversions,verbs=get;list;watch;delete;update;patch
 
+// +kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=noobaas,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=odf.openshift.io,namespace=system,resources=storagesystems,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=ocs.openshift.io,namespace=system,resources=storageclusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="apps",namespace=system,resources=statefulsets,verbs=get;list;watch
 // +kubebuilder:rbac:groups="storage.k8s.io",resources=storageclass,verbs=get;list;watch
@@ -192,12 +206,16 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 		if err := r.reconcileODFOperatorMgrConfig(); err != nil {
 			return ctrl.Result{}, err
 		}
-		/*if err := r.reconcileStorageSystem(); err != nil {
-			return ctrl.Result{}, err
-		}*/
-		if err := r.reconcileStorageCluster(); err != nil {
+		if err := r.reconcileStorageSystem(); err != nil {
 			return ctrl.Result{}, err
 		}
+		if err := r.reconcileNoobaa(); err != nil {
+			return ctrl.Result{}, err
+		}
+		/*
+			if err := r.reconcileStorageCluster(); err != nil {
+				return ctrl.Result{}, err
+			}*/
 		r.managedMCG.Status.ReconcileStrategy = r.reconcileStrategy
 
 	} /*else if initiateUninstall {
@@ -207,10 +225,69 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 	return ctrl.Result{}, nil
 }
 
+func (r *ManagedMCGReconciler) reconcileNoobaa() error {
+	r.Log.Info("Reconciling Noobaa")
+	noobaList := noobaa.NooBaaList{}
+	if err := r.list(&noobaList); err == nil {
+		for _, noobaa := range noobaList.Items {
+			if noobaa.Name == "nooba" {
+				r.Log.Info("Noona instnce already exists.")
+				return nil
+			}
+		}
+	}
+	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.noobaa, func() error {
+		desired := templates.NoobaTemplate.DeepCopy()
+		r.noobaa.Spec = desired.Spec
+		return nil
+	})
+	return err
+
+}
+func (r *ManagedMCGReconciler) reconcileStorageSystem() error {
+	r.Log.Info("Reconciling StorageSystem.")
+
+	/*ssList := odfv1alpha1.StorageSystemList{}
+	if err := r.list(&ssList); err == nil {
+		return nil
+	} */
+	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.storageSystem, func() error {
+		//TODO remove after 4.10
+		// if err := r.own(r.storageCluster); err != nil {
+		// 	return err
+		// }
+
+		// Handle only strict mode reconciliation
+		if r.reconcileStrategy == mcgv1alpha1.ReconcileStrategyStrict {
+			var desired *odfv1alpha1.StorageSystem = nil
+			var err error
+
+			if desired, err = r.getDesiredConvergedStorageSystem(); err != nil {
+				return err
+			}
+			// Override storage cluster spec with desired spec from the template.
+			// We do not replace meta or status on purpose
+			r.storageSystem.Spec = desired.Spec
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *ManagedMCGReconciler) getDesiredConvergedStorageSystem() (*odfv1alpha1.StorageSystem, error) {
+
+	ss := templates.StorageSystemTemplate.DeepCopy()
+	return ss, nil
+}
+
 func (r *ManagedMCGReconciler) verifyComponentsDoNotExist() bool {
 	subComponent := r.managedMCG.Status.Components
 
-	if subComponent.StorageCluster.State == mcgv1alpha1.ComponentNotFound {
+	if subComponent.Noobaa.State == mcgv1alpha1.ComponentNotFound {
 		return true
 	}
 	return false
@@ -271,18 +348,18 @@ func (r *ManagedMCGReconciler) getDesiredConvergedStorageCluster() (*ocsv1.Stora
 
 func (r *ManagedMCGReconciler) updateComponentStatus() {
 	// Getting the status of the StorageCluster component.
-	scStatus := &r.managedMCG.Status.Components.StorageCluster
-	if err := r.get(r.storageCluster); err == nil {
-		if r.storageCluster.Status.Phase == "Ready" {
-			scStatus.State = mcgv1alpha1.ComponentReady
+	noobaa := &r.managedMCG.Status.Components.Noobaa
+	if err := r.get(r.noobaa); err == nil {
+		if r.noobaa.Status.Conditions[0].Status == "Ready" {
+			noobaa.State = mcgv1alpha1.ComponentReady
 		} else {
-			scStatus.State = mcgv1alpha1.ComponentPending
+			noobaa.State = mcgv1alpha1.ComponentPending
 		}
 	} else if errors.IsNotFound(err) {
-		scStatus.State = mcgv1alpha1.ComponentNotFound
+		noobaa.State = mcgv1alpha1.ComponentNotFound
 	} else {
 		r.Log.V(-1).Info("error getting StorageCluster, setting compoment status to Unknown")
-		scStatus.State = mcgv1alpha1.ComponentUnknown
+		noobaa.State = mcgv1alpha1.ComponentUnknown
 	}
 
 	// Getting the status of the Prometheus component.
@@ -358,10 +435,12 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}*/
 
 	return ctrl.NewControllerManagedBy(mgr).
+		WithOptions(ctrlOptions).
 		For(&mcgv1alpha1.ManagedMCG{}, managedMCGredicates).
 		//Owns(&ocsv1.StorageCluster{}, builder.WithPredicates(utils.StorageClusterPredicate, ignoreCreatePredicate)).
-		WithOptions(ctrlOptions).
-		Watches(&source.Kind{Type: &ocsv1.StorageCluster{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&source.Kind{Type: &noobaa.NooBaa{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&source.Kind{Type: &odfv1alpha1.StorageSystem{}}, &handler.EnqueueRequestForObject{}).
+		//Watches(&source.Kind{Type: &odfv1alpha1.StorageSystem{}}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
 }
 

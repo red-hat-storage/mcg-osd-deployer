@@ -4,6 +4,8 @@ go 1.16
 
 require (
 	github.com/go-logr/logr v0.4.0
+	github.com/go-openapi/spec v0.19.8
+	github.com/noobaa/noobaa-operator/v5 v5.0.0-20210912161037-7eb9969404e4
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.18.1
 	github.com/operator-framework/api v0.10.0
@@ -14,6 +16,7 @@ require (
 	k8s.io/apimachinery v0.23.0
 	k8s.io/client-go v12.0.0+incompatible
 	sigs.k8s.io/controller-runtime v0.9.5
+
 )
 
 replace (

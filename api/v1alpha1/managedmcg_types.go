@@ -58,10 +58,10 @@ type ComponentStatus struct {
 }
 
 type ComponentStatusMap struct {
-	StorageCluster ComponentStatus `json:"StorageCluster"`
-	//Noobaa       ComponentStatus `json:"noobaa"`
-	Prometheus   ComponentStatus `json:"prometheus"`
-	Alertmanager ComponentStatus `json:"alertmanager"`
+	//StorageCluster ComponentStatus `json:"StorageCluster"`
+	Noobaa         ComponentStatus `json:"noobaa"`
+	Prometheus     ComponentStatus `json:"prometheus"`
+	Alertmanager   ComponentStatus `json:"alertmanager"`
 }
 
 // ManagedMCGStatus defines the observed state of ManagedMCG

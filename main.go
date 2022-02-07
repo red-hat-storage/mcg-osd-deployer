@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	noobaa "github.com/noobaa/noobaa-operator/v5/pkg/apis"
 	mcgv1alpha1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
 	"github.com/red-hat-storage/mcg-osd-deployer/controllers"
 	//+kubebuilder:scaffold:imports
@@ -68,6 +69,8 @@ func addAllSchemes(scheme *runtime.Scheme) {
 	utilruntime.Must(odfv1alpha1.AddToScheme(scheme))
 
 	utilruntime.Must(mcgv1alpha1.AddToScheme(scheme))
+
+	utilruntime.Must(noobaa.AddToScheme(scheme))
 
 	// +kubebuilder:scaffold:scheme
 }

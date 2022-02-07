@@ -41,5 +41,6 @@ var StorageClusterTemplate = ocsv1.StorageCluster{
 		MultiCloudGateway: &ocsv1.MultiCloudGatewaySpec{
 			ReconcileStrategy: "ignore",
 		},
+		Version: "4.9.0",
 	},
 }

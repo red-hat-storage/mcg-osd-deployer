@@ -24,7 +24,7 @@ func isReady(client client.Client, managedMCGResource types.NamespacedName, log 
 		log.Error(err, "Error while ensuring managedMCG")
 		return false, err
 	}
-	ready := managedMCG.Status.Components.StorageCluster.State == v1.ComponentReady //&&
+	ready := managedMCG.Status.Components.Noobaa.State == v1.ComponentReady //&&
 	//managedMCG.Status.Components.Prometheus.State == v1.ComponentReady &&
 	//managedMCG.Status.Components.Alertmanager.State == v1.ComponentReady
 
