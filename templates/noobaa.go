@@ -21,43 +21,12 @@ import (
 	noobaa "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // StorageClusterTemplate is the template that serves as the base for the storage clsuter deployed by the operator
 
-var image string = "registry.redhat.io/odf4/mcg-core-rhel8@sha256:5507f2c1074bfb023415f0fef16ec42fbe6e90c540fc45f1111c8c929e477910"
-var imageDb string = "registry.redhat.io/rhel8/postgresql-12@sha256:623bdaa1c6ae047db7f62d82526220fac099837afd8770ccc6acfac4c7cff100"
-
 var NoobaTemplate = &noobaa.NooBaa{
 	Spec: noobaa.NooBaaSpec{
-		CoreResources: &v1.ResourceRequirements{
-			Limits: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("1"),
-				v1.ResourceMemory: resource.MustParse("4Gi"),
-			},
-			Requests: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("1"),
-				v1.ResourceMemory: resource.MustParse("4Gi"),
-			},
-		},
-		DBResources: &v1.ResourceRequirements{
-			Limits: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("500m"),
-				v1.ResourceMemory: resource.MustParse("4Gi"),
-			},
-			Requests: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("500m"),
-				v1.ResourceMemory: resource.MustParse("4Gi"),
-			},
-		},
-		DBVolumeResources: &v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceStorage: resource.MustParse("50Gi"),
-			},
-		},
-		Image:   &(image),
-		DBImage: &(imageDb),
 		Endpoints: &noobaa.EndpointsSpec{
 			MinCount: 1,
 			MaxCount: 2,

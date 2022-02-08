@@ -23,8 +23,8 @@ replace (
 	github.com/go-logr/logr => github.com/go-logr/logr v0.4.0
 	github.com/hashicorp/vault => github.com/hashicorp/vault v1.9.3
 	github.com/irifrance/gini => github.com/go-air/gini v1.0.4
-	github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc3 // required by rook v1.7
 	github.com/mikefarah/yaml/v2 => github.com/mikefarah/yq/v4 v4.18.1
+	github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc3 // required by rook v1.7
 	github.com/openshift/api => github.com/openshift/api v0.0.0-20210430163505-eeaa94b80043
 	github.com/portworx/sched-ops => github.com/portworx/sched-ops v0.20.4-openstorage-rc3 // required by rook v1.7
 	k8s.io/api => k8s.io/api v0.21.3

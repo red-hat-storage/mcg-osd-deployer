@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -28,7 +29,6 @@ import (
 	mcgv1alpha1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
 	"github.com/red-hat-storage/mcg-osd-deployer/templates"
 	"github.com/red-hat-storage/mcg-osd-deployer/utils"
-	ocsv1 "github.com/red-hat-storage/ocs-operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,6 +52,12 @@ const (
 	storageSystemName               = "ocs-storagecluster-storagesystem"
 )
 
+// ImageMap holds mapping information between component image name and the image url
+type ImageMap struct {
+	NooBaaCore string
+	NooBaaDB   string
+}
+
 // ManagedMCGReconciler reconciles a ManagedMCG object
 type ManagedMCGReconciler struct {
 	Client             client.Client
@@ -63,10 +69,10 @@ type ManagedMCGReconciler struct {
 	namespace          string
 	reconcileStrategy  mcgv1alpha1.ReconcileStrategy
 
-	storageCluster              *ocsv1.StorageCluster
 	odfOperatorManagerconfigMap *corev1.ConfigMap
 	noobaa                      *noobaa.NooBaa
 	storageSystem               *odfv1alpha1.StorageSystem
+	images                      ImageMap
 }
 
 func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
@@ -76,10 +82,6 @@ func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
 	r.managedMCG = &mcgv1alpha1.ManagedMCG{}
 	r.managedMCG.Name = req.NamespacedName.Name
 	r.managedMCG.Namespace = r.namespace
-
-	r.storageCluster = &ocsv1.StorageCluster{}
-	r.storageCluster.Name = StorageClusterName
-	r.storageCluster.Namespace = r.namespace
 
 	r.odfOperatorManagerconfigMap = &corev1.ConfigMap{}
 	r.odfOperatorManagerconfigMap.Name = odfOperatorManagerconfigMapName
@@ -174,11 +176,11 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 			r.Log.Info("finallizer removed successfully")
 
 		} else {
-			// Storage cluster needs to be deleted before we delete the CSV so we can not leave it to the
+			// noobaa needs to be deleted before we delete the CSV so we can not leave it to the
 			// k8s garbage collector to delete it
 			r.Log.Info("deleting storagecluster")
-			if err := r.delete(r.storageCluster); err != nil {
-				return ctrl.Result{}, fmt.Errorf("unable to delete storageSystem: %v", err)
+			if err := r.delete(r.noobaa); err != nil {
+				return ctrl.Result{}, fmt.Errorf("unable to delete nooba: %v", err)
 			}
 		}
 
@@ -212,10 +214,7 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 		if err := r.reconcileNoobaa(); err != nil {
 			return ctrl.Result{}, err
 		}
-		/*
-			if err := r.reconcileStorageCluster(); err != nil {
-				return ctrl.Result{}, err
-			}*/
+
 		r.managedMCG.Status.ReconcileStrategy = r.reconcileStrategy
 
 	} /*else if initiateUninstall {
@@ -236,13 +235,69 @@ func (r *ManagedMCGReconciler) reconcileNoobaa() error {
 			}
 		}
 	}
-	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.noobaa, func() error {
-		desired := templates.NoobaTemplate.DeepCopy()
-		r.noobaa.Spec = desired.Spec
+	desiredNooba := templates.NoobaTemplate.DeepCopy()
+	err := r.setNooBaaDesiredState(desiredNooba)
+	_, err = ctrl.CreateOrUpdate(r.ctx, r.Client, r.noobaa, func() error {
+		if err := r.own(r.storageSystem); err != nil {
+			return err
+		}
+		r.noobaa.Spec = desiredNooba.Spec
 		return nil
 	})
 	return err
+}
 
+func (r *ManagedMCGReconciler) setNooBaaDesiredState(desiredNooba *noobaa.NooBaa) error {
+	coreResources := utils.GetDaemonResources("noobaa-core")
+	dbResources := utils.GetDaemonResources("noobaa-db")
+	dBVolumeResources := utils.GetDaemonResources("noobaa-db-vol")
+	endpointResources := utils.GetDaemonResources("noobaa-endpoint")
+
+	desiredNooba.Labels = map[string]string{
+		"app": "noobaa",
+	}
+	desiredNooba.Spec.CoreResources = &coreResources
+	desiredNooba.Spec.DBResources = &dbResources
+
+	desiredNooba.Spec.DBVolumeResources = &dBVolumeResources
+	desiredNooba.Spec.Image = &r.images.NooBaaCore
+	desiredNooba.Spec.DBImage = &r.images.NooBaaDB
+	desiredNooba.Spec.DBType = noobaa.DBTypePostgres
+
+	// Default endpoint spec.
+	desiredNooba.Spec.Endpoints = &noobaa.EndpointsSpec{
+		MinCount:               1,
+		MaxCount:               2,
+		AdditionalVirtualHosts: []string{},
+
+		// TODO: After spec.resources["noobaa-endpoint"] is decleared obesolete this
+		// definition should hold a constant value. and should not be read from
+		// GetDaemonResources()
+		Resources: &endpointResources,
+	}
+
+	// Override with MCG options specified in the storage cluster spec
+	/*if sc.Spec.MultiCloudGateway != nil {
+		dbStorageClass := sc.Spec.MultiCloudGateway.DbStorageClassName
+		if dbStorageClass != "" {
+			nb.Spec.DBStorageClass = &dbStorageClass
+			nb.Spec.PVPoolDefaultStorageClass = &dbStorageClass
+		}
+		if sc.Spec.MultiCloudGateway.Endpoints != nil {
+			epSpec := sc.Spec.MultiCloudGateway.Endpoints
+
+			nb.Spec.Endpoints.MinCount = epSpec.MinCount
+			nb.Spec.Endpoints.MaxCount = epSpec.MaxCount
+			if epSpec.AdditionalVirtualHosts != nil {
+				nb.Spec.Endpoints.AdditionalVirtualHosts = epSpec.AdditionalVirtualHosts
+			}
+			if epSpec.Resources != nil {
+				nb.Spec.Endpoints.Resources = epSpec.Resources
+			}
+		}
+	}*/
+
+	return nil
 }
 func (r *ManagedMCGReconciler) reconcileStorageSystem() error {
 	r.Log.Info("Reconciling StorageSystem.")
@@ -261,12 +316,10 @@ func (r *ManagedMCGReconciler) reconcileStorageSystem() error {
 		if r.reconcileStrategy == mcgv1alpha1.ReconcileStrategyStrict {
 			var desired *odfv1alpha1.StorageSystem = nil
 			var err error
-
 			if desired, err = r.getDesiredConvergedStorageSystem(); err != nil {
 				return err
 			}
-			// Override storage cluster spec with desired spec from the template.
-			// We do not replace meta or status on purpose
+
 			r.storageSystem.Spec = desired.Spec
 		}
 		return nil
@@ -295,7 +348,6 @@ func (r *ManagedMCGReconciler) verifyComponentsDoNotExist() bool {
 
 func (r *ManagedMCGReconciler) reconcileODFOperatorMgrConfig() error {
 	r.Log.Info("Reconciling odf-operator-manager-config ConfigMap")
-
 	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.odfOperatorManagerconfigMap, func() error {
 		r.odfOperatorManagerconfigMap.Data["ODF_SUBSCRIPTION_NAME"] = "odf-operator-stable-4.9-redhat-operators-openshift-marketplace"
 		return nil
@@ -306,51 +358,13 @@ func (r *ManagedMCGReconciler) reconcileODFOperatorMgrConfig() error {
 	return nil
 }
 
-func (r *ManagedMCGReconciler) reconcileStorageCluster() error {
-	r.Log.Info("Reconciling StorageCluster")
-
-	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.storageCluster, func() error {
-		/* 4.10 changes
-		if err := r.own(r.storageCluster); err != nil {
-			return err
-		}*/
-
-		// Handle only strict mode reconciliation
-		if r.reconcileStrategy == mcgv1alpha1.ReconcileStrategyStrict {
-			var desired *ocsv1.StorageCluster = nil
-			var err error = nil
-			if desired, err = r.getDesiredConvergedStorageCluster(); err != nil {
-				return err
-			}
-
-			// Override storage cluster spec with desired spec from the template.
-			// We do not replace meta or status on purpose
-			r.storageCluster.Spec = desired.Spec
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (r *ManagedMCGReconciler) getDesiredConvergedStorageCluster() (*ocsv1.StorageCluster, error) {
-
-	sc := templates.StorageClusterTemplate.DeepCopy()
-
-	r.Log.Info("Enabling Multi Cloud Gateway")
-	sc.Spec.MultiCloudGateway.ReconcileStrategy = "standalone"
-
-	return sc, nil
-}
-
 func (r *ManagedMCGReconciler) updateComponentStatus() {
+	r.Log.Info("Updating component status")
+
 	// Getting the status of the StorageCluster component.
 	noobaa := &r.managedMCG.Status.Components.Noobaa
 	if err := r.get(r.noobaa); err == nil {
-		if r.noobaa.Status.Conditions[0].Status == "Ready" {
+		if r.noobaa.Status.Phase == "Ready" {
 			noobaa.State = mcgv1alpha1.ComponentReady
 		} else {
 			noobaa.State = mcgv1alpha1.ComponentPending
@@ -418,15 +432,17 @@ func (r *ManagedMCGReconciler) updateComponentStatus() {
 // SetupWithManager sets up the controller with the Manager.
 func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
+	if err := r.initializeImageVars(); err != nil {
+		return err
+	}
+
+	r.Log.Info("Setting Reconciler...")
 	ctrlOptions := controller.Options{
 		MaxConcurrentReconciles: 1,
 	}
 	managedMCGredicates := builder.WithPredicates(
 		predicate.GenerationChangedPredicate{},
 	)
-
-	r.Log.Info("Setting Reconciler...")
-
 	/*ignoreCreatePredicate := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			// Ignore create events as resource created by us
@@ -436,12 +452,29 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(ctrlOptions).
+		Owns(&noobaa.NooBaa{}).
+		Owns(&mcgv1alpha1.ManagedMCG{}).
 		For(&mcgv1alpha1.ManagedMCG{}, managedMCGredicates).
-		//Owns(&ocsv1.StorageCluster{}, builder.WithPredicates(utils.StorageClusterPredicate, ignoreCreatePredicate)).
+		Watches(&source.Kind{Type: &mcgv1alpha1.ManagedMCG{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &noobaa.NooBaa{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &odfv1alpha1.StorageSystem{}}, &handler.EnqueueRequestForObject{}).
-		//Watches(&source.Kind{Type: &odfv1alpha1.StorageSystem{}}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
+}
+
+func (r *ManagedMCGReconciler) initializeImageVars() error {
+	r.images.NooBaaCore = os.Getenv("NOOBAA_CORE_IMAGE")
+	r.images.NooBaaDB = os.Getenv("NOOBAA_DB_IMAGE")
+
+	if r.images.NooBaaCore == "" {
+		err := fmt.Errorf("NOOBAA_CORE_IMAGE environment variable not found")
+		r.Log.Error(err, "Missing NOOBAA_CORE_IMAGE environment variable for ocs initialization.")
+		return err
+	} else if r.images.NooBaaDB == "" {
+		err := fmt.Errorf("NOOBAA_DB_IMAGE environment variable not found")
+		r.Log.Error(err, "Missing NOOBAA_DB_IMAGE environment variable for ocs initialization.")
+		return err
+	}
+	return nil
 }
 
 func (r *ManagedMCGReconciler) get(obj client.Object) error {
