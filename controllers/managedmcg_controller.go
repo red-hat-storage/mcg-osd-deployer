@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,12 +45,12 @@ import (
 )
 
 const (
-	ManagedMCGFinalizer = "managedmcg.ocs.openshift.io"
+	ManagedMCGFinalizer = "managedmcg.openshift.io"
 
-	StorageClusterName              = "ocs-storagecluster"
 	odfOperatorManagerconfigMapName = "odf-operator-manager-config"
 	noobaaName                      = "noobaa"
-	storageSystemName               = "ocs-storagecluster-storagesystem"
+	storageSystemName               = "mcg-storagecluster-storagesystem"
+	ManagedMCGName                  = "managedmcg"
 )
 
 // ImageMap holds mapping information between component image name and the image url
@@ -178,7 +179,7 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 		} else {
 			// noobaa needs to be deleted before we delete the CSV so we can not leave it to the
 			// k8s garbage collector to delete it
-			r.Log.Info("deleting storagecluster")
+			r.Log.Info("deleting noobaa")
 			if err := r.delete(r.noobaa); err != nil {
 				return ctrl.Result{}, fmt.Errorf("unable to delete nooba: %v", err)
 			}
@@ -199,10 +200,6 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 		if strings.EqualFold(string(r.managedMCG.Spec.ReconcileStrategy), string(mcgv1alpha1.ReconcileStrategyNone)) {
 			r.reconcileStrategy = mcgv1alpha1.ReconcileStrategyNone
 		}
-
-		/*if err := r.get(r.addonParamSecret); err != nil {
-			return ctrl.Result{}, fmt.Errorf("Failed to get the addon param secret, Secret Name: %v", r.AddonParamSecretName)
-		}*/
 
 		// Reconcile the different resources
 		if err := r.reconcileODFOperatorMgrConfig(); err != nil {
@@ -276,50 +273,28 @@ func (r *ManagedMCGReconciler) setNooBaaDesiredState(desiredNooba *noobaa.NooBaa
 		Resources: &endpointResources,
 	}
 
-	// Override with MCG options specified in the storage cluster spec
-	/*if sc.Spec.MultiCloudGateway != nil {
-		dbStorageClass := sc.Spec.MultiCloudGateway.DbStorageClassName
-		if dbStorageClass != "" {
-			nb.Spec.DBStorageClass = &dbStorageClass
-			nb.Spec.PVPoolDefaultStorageClass = &dbStorageClass
-		}
-		if sc.Spec.MultiCloudGateway.Endpoints != nil {
-			epSpec := sc.Spec.MultiCloudGateway.Endpoints
-
-			nb.Spec.Endpoints.MinCount = epSpec.MinCount
-			nb.Spec.Endpoints.MaxCount = epSpec.MaxCount
-			if epSpec.AdditionalVirtualHosts != nil {
-				nb.Spec.Endpoints.AdditionalVirtualHosts = epSpec.AdditionalVirtualHosts
-			}
-			if epSpec.Resources != nil {
-				nb.Spec.Endpoints.Resources = epSpec.Resources
-			}
-		}
-	}*/
-
 	return nil
 }
 func (r *ManagedMCGReconciler) reconcileStorageSystem() error {
 	r.Log.Info("Reconciling StorageSystem.")
 
-	/*ssList := odfv1alpha1.StorageSystemList{}
+	ssList := odfv1alpha1.StorageSystemList{}
 	if err := r.list(&ssList); err == nil {
-		return nil
-	} */
+		for _, storageSyste := range ssList.Items {
+			if storageSyste.Name == storageSystemName {
+				r.Log.Info("storageSystem instnce already exists.")
+				return nil
+			}
+		}
+	}
 	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.storageSystem, func() error {
-		//TODO remove after 4.10
-		// if err := r.own(r.storageCluster); err != nil {
-		// 	return err
-		// }
 
-		// Handle only strict mode reconciliation
 		if r.reconcileStrategy == mcgv1alpha1.ReconcileStrategyStrict {
 			var desired *odfv1alpha1.StorageSystem = nil
 			var err error
 			if desired, err = r.getDesiredConvergedStorageSystem(); err != nil {
 				return err
 			}
-
 			r.storageSystem.Spec = desired.Spec
 		}
 		return nil
@@ -350,6 +325,8 @@ func (r *ManagedMCGReconciler) reconcileODFOperatorMgrConfig() error {
 	r.Log.Info("Reconciling odf-operator-manager-config ConfigMap")
 	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.odfOperatorManagerconfigMap, func() error {
 		r.odfOperatorManagerconfigMap.Data["ODF_SUBSCRIPTION_NAME"] = "odf-operator-stable-4.9-redhat-operators-openshift-marketplace"
+		r.odfOperatorManagerconfigMap.Data["NOOBAA_SUBSCRIPTION_STARTINGCSV"] = "mcg-operator.v4.9.2"
+
 		return nil
 	})
 	if err != nil {
@@ -375,58 +352,6 @@ func (r *ManagedMCGReconciler) updateComponentStatus() {
 		r.Log.V(-1).Info("error getting StorageCluster, setting compoment status to Unknown")
 		noobaa.State = mcgv1alpha1.ComponentUnknown
 	}
-
-	// Getting the status of the Prometheus component.
-	/*promStatus := &r.managedMCG.Status.Components.Prometheus
-	if err := r.get(r.prometheus); err == nil {
-		promStatefulSet := &appsv1.StatefulSet{}
-		promStatefulSet.Namespace = r.namespace
-		promStatefulSet.Name = fmt.Sprintf("prometheus-%s", prometheusName)
-		if err := r.get(promStatefulSet); err == nil {
-			desiredReplicas := int32(1)
-			if r.prometheus.Spec.Replicas != nil {
-				desiredReplicas = *r.prometheus.Spec.Replicas
-			}
-			if promStatefulSet.Status.ReadyReplicas != desiredReplicas {
-				promStatus.State = v1.ComponentPending
-			} else {
-				promStatus.State = v1.ComponentReady
-			}
-		} else {
-			promStatus.State = v1.ComponentPending
-		}
-	} else if errors.IsNotFound(err) {
-		promStatus.State = v1.ComponentNotFound
-	} else {
-		r.Log.V(-1).Info("error getting Prometheus, setting compoment status to Unknown")
-		promStatus.State = v1.ComponentUnknown
-	}
-
-	// Getting the status of the Alertmanager component.
-	amStatus := &r.managedOCS.Status.Components.Alertmanager
-	if err := r.get(r.alertmanager); err == nil {
-		amStatefulSet := &appsv1.StatefulSet{}
-		amStatefulSet.Namespace = r.namespace
-		amStatefulSet.Name = fmt.Sprintf("alertmanager-%s", alertmanagerName)
-		if err := r.get(amStatefulSet); err == nil {
-			desiredReplicas := int32(1)
-			if r.alertmanager.Spec.Replicas != nil {
-				desiredReplicas = *r.alertmanager.Spec.Replicas
-			}
-			if amStatefulSet.Status.ReadyReplicas != desiredReplicas {
-				amStatus.State = v1.ComponentPending
-			} else {
-				amStatus.State = v1.ComponentReady
-			}
-		} else {
-			amStatus.State = v1.ComponentPending
-		}
-	} else if errors.IsNotFound(err) {
-		amStatus.State = v1.ComponentNotFound
-	} else {
-		r.Log.V(-1).Info("error getting Alertmanager, setting compoment status to Unknown")
-		amStatus.State = v1.ComponentUnknown
-	}*/
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -436,28 +361,57 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
-	r.Log.Info("Setting Reconciler...")
-	ctrlOptions := controller.Options{
-		MaxConcurrentReconciles: 1,
-	}
 	managedMCGredicates := builder.WithPredicates(
 		predicate.GenerationChangedPredicate{},
 	)
-	/*ignoreCreatePredicate := predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			// Ignore create events as resource created by us
-			return false
+	ctrlOptions := controller.Options{
+		MaxConcurrentReconciles: 1,
+	}
+	enqueueManangedMCGRequest := handler.EnqueueRequestsFromMapFunc(
+		func(client client.Object) []reconcile.Request {
+			return []reconcile.Request{{
+				NamespacedName: types.NamespacedName{
+					Name:      ManagedMCGName,
+					Namespace: client.GetNamespace(),
+				},
+			}}
 		},
-	}*/
+	)
+	configMapPredicates := builder.WithPredicates(
+		predicate.NewPredicateFuncs(
+			func(client client.Object) bool {
+				name := client.GetName()
+				if name == odfOperatorManagerconfigMapName {
+					return true
+				}
+				return false
+			},
+		),
+	)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(ctrlOptions).
-		Owns(&noobaa.NooBaa{}).
-		Owns(&mcgv1alpha1.ManagedMCG{}).
 		For(&mcgv1alpha1.ManagedMCG{}, managedMCGredicates).
-		Watches(&source.Kind{Type: &mcgv1alpha1.ManagedMCG{}}, &handler.EnqueueRequestForObject{}).
-		Watches(&source.Kind{Type: &noobaa.NooBaa{}}, &handler.EnqueueRequestForObject{}).
-		Watches(&source.Kind{Type: &odfv1alpha1.StorageSystem{}}, &handler.EnqueueRequestForObject{}).
+
+		// Watch owned resources
+		Owns(&noobaa.NooBaa{}).
+		Owns(&odfv1alpha1.StorageSystem{}).
+		Owns(&corev1.ConfigMap{}).
+
+		// Watch non-owned resources
+		Watches(
+			&source.Kind{Type: &corev1.ConfigMap{}},
+			enqueueManangedMCGRequest,
+			configMapPredicates,
+		).
+		Watches(
+			&source.Kind{Type: &odfv1alpha1.StorageSystem{}},
+			enqueueManangedMCGRequest,
+		).
+		Watches(
+			&source.Kind{Type: &noobaa.NooBaa{}},
+			enqueueManangedMCGRequest,
+		).
 		Complete(r)
 }
 
