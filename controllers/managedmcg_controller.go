@@ -278,15 +278,10 @@ func (r *ManagedMCGReconciler) setNooBaaDesiredState(desiredNooba *noobaa.NooBaa
 func (r *ManagedMCGReconciler) reconcileStorageSystem() error {
 	r.Log.Info("Reconciling StorageSystem.")
 
-	/*ssList := odfv1alpha1.StorageSystemList{}
-	if err := r.list(&ssList); err == nil {
-		return nil
-	} */
-
 	ssList := odfv1alpha1.StorageSystemList{}
 	if err := r.list(&ssList); err == nil {
-		for _, noobaa := range ssList.Items {
-			if noobaa.Name == storageSystemName {
+		for _, storageSyste := range ssList.Items {
+			if storageSyste.Name == storageSystemName {
 				r.Log.Info("storageSystem instnce already exists.")
 				return nil
 			}
