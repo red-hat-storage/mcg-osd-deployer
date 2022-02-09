@@ -11,11 +11,11 @@ var (
 	DaemonResources = map[string]corev1.ResourceRequirements{
 		"noobaa-core": {
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceCPU:    resource.MustParse("500m"),
 				corev1.ResourceMemory: resource.MustParse("4Gi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceCPU:    resource.MustParse("500m"),
 				corev1.ResourceMemory: resource.MustParse("4Gi"),
 			},
 		},

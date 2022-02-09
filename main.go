@@ -164,7 +164,7 @@ func readEnvVars() (map[string]string, error) {
 func ensureManagedMCG(c client.Client, log logr.Logger, envVars map[string]string) error {
 	err := c.Create(context.Background(), &mcgv1alpha1.ManagedMCG{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:       "managedmcg",
+			Name:       controllers.ManagedMCGName,
 			Namespace:  envVars[namespaceEnvVarName],
 			Finalizers: []string{controllers.ManagedMCGFinalizer},
 		},

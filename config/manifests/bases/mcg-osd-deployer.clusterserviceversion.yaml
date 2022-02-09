@@ -50,11 +50,11 @@ spec:
   - Storage
   - MCG
   links:
-  - name: OCS OSD Deployer
+  - name: MCG OSD Deployer
     url: https://github.com/red-hat-storage/mcg-osd-deployer
   maintainers:
-  - email: omitrani@redhat.com
-    name: Ohad Mitrani
+  - email: napaul@redhat.com
+    name: Naveen Paul
   maturity: alpha
   provider:
     name: Red Hat
