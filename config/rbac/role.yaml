@@ -7,6 +7,12 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - console.openshift.io
+  resources:
+  - consoleplugins
+  verbs:
+  - '*'
+- apiGroups:
   - mcg.openshift.io
   resources:
   - managedmcg
@@ -49,6 +55,12 @@ rules:
   - patch
   - update
 - apiGroups:
+  - operator.openshift.io
+  resources:
+  - consoles
+  verbs:
+  - '*'
+- apiGroups:
   - storage.k8s.io
   resources:
   - storageclass
@@ -77,14 +89,6 @@ rules:
   - update
   - watch
 - apiGroups:
-  - apps
-  resources:
-  - statefulsets
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - coordination.k8s.io
   resources:
   - leases
@@ -98,18 +102,6 @@ rules:
   - noobaa.io
   resources:
   - noobaas
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ocs.openshift.io
-  resources:
-  - storageclusters
   verbs:
   - create
   - delete

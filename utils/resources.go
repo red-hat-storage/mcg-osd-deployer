@@ -44,5 +44,15 @@ var (
 				corev1.ResourceMemory: resource.MustParse("2Gi"),
 			},
 		},
+		"odf-operator": {
+			Limits: corev1.ResourceList{
+				"cpu":    resource.MustParse("200m"),
+				"memory": resource.MustParse("120Mi"),
+			},
+			Requests: corev1.ResourceList{
+				"cpu":    resource.MustParse("200m"),
+				"memory": resource.MustParse("120Mi"),
+			},
+		},
 	}
 )

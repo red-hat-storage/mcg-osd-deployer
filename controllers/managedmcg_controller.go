@@ -24,6 +24,7 @@ import (
 
 	"github.com/go-logr/logr"
 	noobaa "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	odfv1alpha1 "github.com/red-hat-data-services/odf-operator/api/v1alpha1"
 	mcgv1alpha1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
@@ -49,8 +50,11 @@ const (
 
 	odfOperatorManagerconfigMapName = "odf-operator-manager-config"
 	noobaaName                      = "noobaa"
-	storageSystemName               = "mcg-storagecluster-storagesystem"
+	storageSystemName               = "mcg-storagesystem"
 	ManagedMCGName                  = "managedmcg"
+	odfOperatorName                 = "odf-operator"
+	operatorConsoleName             = "cluster"
+	odfConsoleName                  = "odf-console"
 )
 
 // ImageMap holds mapping information between component image name and the image url
@@ -74,6 +78,7 @@ type ManagedMCGReconciler struct {
 	noobaa                      *noobaa.NooBaa
 	storageSystem               *odfv1alpha1.StorageSystem
 	images                      ImageMap
+	operatorConsole             *operatorv1.Console
 }
 
 func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
@@ -96,6 +101,9 @@ func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
 	r.storageSystem.Name = storageSystemName
 	r.storageSystem.Namespace = r.namespace
 
+	r.operatorConsole = &operatorv1.Console{}
+	r.operatorConsole.Name = operatorConsoleName
+
 }
 
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources={managedmcg,managedmcg/finalizers},verbs=get;list;watch;create;update;patch;delete
@@ -108,9 +116,9 @@ func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
 
 // +kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=noobaas,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=odf.openshift.io,namespace=system,resources=storagesystems,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=ocs.openshift.io,namespace=system,resources=storageclusters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="apps",namespace=system,resources=statefulsets,verbs=get;list;watch
 // +kubebuilder:rbac:groups="storage.k8s.io",resources=storageclass,verbs=get;list;watch
+//+kubebuilder:rbac:groups=console.openshift.io,resources=consoleplugins,verbs=*
+//+kubebuilder:rbac:groups=operator.openshift.io,resources=consoles,verbs=*
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -159,10 +167,7 @@ func (r *ManagedMCGReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 	r.Log.Info("Reconciler phase started..&&")
-	// Uninstallation depends on the status of the components.
-	// We are checking the uninstallation condition before getting the component status
-	// to mitigate scenarios where changes to the component status occurs while the uninstallation logic is running.
-	//initiateUninstall := r.checkUninstallCondition()
+
 	// Update the status of the components
 	r.updateComponentStatus()
 
@@ -177,8 +182,7 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 			r.Log.Info("finallizer removed successfully")
 
 		} else {
-			// noobaa needs to be deleted before we delete the CSV so we can not leave it to the
-			// k8s garbage collector to delete it
+			// noobaa needs to be deleted
 			r.Log.Info("deleting noobaa")
 			if err := r.delete(r.noobaa); err != nil {
 				return ctrl.Result{}, fmt.Errorf("unable to delete nooba: %v", err)
@@ -208,17 +212,36 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 		if err := r.reconcileStorageSystem(); err != nil {
 			return ctrl.Result{}, err
 		}
+		if err := r.reconcileConsoleCluster(); err != nil {
+			return ctrl.Result{}, err
+		}
 		if err := r.reconcileNoobaa(); err != nil {
 			return ctrl.Result{}, err
 		}
-
 		r.managedMCG.Status.ReconcileStrategy = r.reconcileStrategy
 
-	} /*else if initiateUninstall {
-		return ctrl.Result{}, r.removeOLMComponents()
-	}*/
-
+	}
 	return ctrl.Result{}, nil
+}
+
+func (r *ManagedMCGReconciler) reconcileConsoleCluster() error {
+
+	consoleList := operatorv1.ConsoleList{}
+	if err := r.Client.List(r.ctx, &consoleList); err == nil {
+		for _, cluster := range consoleList.Items {
+			if utils.Contains(cluster.Spec.Plugins, odfConsoleName) {
+				r.Log.Info("Cluster instnce already exists.")
+				return nil
+			}
+		}
+	}
+
+	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.operatorConsole, func() error {
+		r.operatorConsole.Spec.Plugins = append(r.operatorConsole.Spec.Plugins, odfConsoleName)
+		return nil
+	})
+	r.Log.Info("Updqted Console resources")
+	return err
 }
 
 func (r *ManagedMCGReconciler) reconcileNoobaa() error {
@@ -307,7 +330,6 @@ func (r *ManagedMCGReconciler) reconcileStorageSystem() error {
 }
 
 func (r *ManagedMCGReconciler) getDesiredConvergedStorageSystem() (*odfv1alpha1.StorageSystem, error) {
-
 	ss := templates.StorageSystemTemplate.DeepCopy()
 	return ss, nil
 }
@@ -338,7 +360,7 @@ func (r *ManagedMCGReconciler) reconcileODFOperatorMgrConfig() error {
 func (r *ManagedMCGReconciler) updateComponentStatus() {
 	r.Log.Info("Updating component status")
 
-	// Getting the status of the StorageCluster component.
+	// Getting the status of the Noobaa component.
 	noobaa := &r.managedMCG.Status.Components.Noobaa
 	if err := r.get(r.noobaa); err == nil {
 		if r.noobaa.Status.Phase == "Ready" {
@@ -349,7 +371,7 @@ func (r *ManagedMCGReconciler) updateComponentStatus() {
 	} else if errors.IsNotFound(err) {
 		noobaa.State = mcgv1alpha1.ComponentNotFound
 	} else {
-		r.Log.V(-1).Info("error getting StorageCluster, setting compoment status to Unknown")
+		r.Log.V(-1).Info("error getting Noobaa, setting compoment status to Unknown")
 		noobaa.State = mcgv1alpha1.ComponentUnknown
 	}
 }
@@ -389,6 +411,14 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		),
 	)
 
+	odfPredicates := builder.WithPredicates(
+		predicate.NewPredicateFuncs(
+			func(client client.Object) bool {
+				return strings.HasPrefix(client.GetName(), odfOperatorName)
+			},
+		),
+	)
+
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(ctrlOptions).
 		For(&mcgv1alpha1.ManagedMCG{}, managedMCGredicates).
@@ -397,6 +427,8 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&noobaa.NooBaa{}).
 		Owns(&odfv1alpha1.StorageSystem{}).
 		Owns(&corev1.ConfigMap{}).
+		Owns(&mcgv1alpha1.ManagedMCG{}).
+		Owns(&opv1a1.ClusterServiceVersion{}).
 
 		// Watch non-owned resources
 		Watches(
@@ -411,6 +443,11 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&source.Kind{Type: &noobaa.NooBaa{}},
 			enqueueManangedMCGRequest,
+		).
+		Watches(
+			&source.Kind{Type: &opv1a1.ClusterServiceVersion{}},
+			enqueueManangedMCGRequest,
+			odfPredicates,
 		).
 		Complete(r)
 }
@@ -471,9 +508,4 @@ func getCSVByPrefix(csvList opv1a1.ClusterServiceVersionList, name string) *opv1
 		}
 	}
 	return csv
-}
-
-func (r *ManagedMCGReconciler) unrestrictedGet(obj client.Object) error {
-	key := client.ObjectKeyFromObject(obj)
-	return r.UnrestrictedClient.Get(r.ctx, key, obj)
 }
