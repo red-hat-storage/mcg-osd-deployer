@@ -27,7 +27,6 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	odfv1alpha1 "github.com/red-hat-data-services/odf-operator/api/v1alpha1"
-	"github.com/red-hat-data-services/odf-operator/console"
 	mcgv1alpha1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
 	"github.com/red-hat-storage/mcg-osd-deployer/templates"
 	"github.com/red-hat-storage/mcg-osd-deployer/utils"
@@ -40,7 +39,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -254,14 +252,6 @@ func (r *ManagedMCGReconciler) reconcileConsoleCluster() error {
 	})
 	r.Log.Info("Updqted Console resources")
 	return err
-}
-
-func (r *ManagedMCGReconciler) reconcileConsolePlugin() error {
-	if err := r.ensureConsolePlugin("4.9"); err != nil {
-		r.Log.Error(err, "Could not ensure compatibility for ODF consolePlugin")
-		return err
-	}
-	return nil
 }
 
 func (r *ManagedMCGReconciler) reconcileNoobaa() error {
@@ -528,47 +518,4 @@ func getCSVByPrefix(csvList opv1a1.ClusterServiceVersionList, name string) *opv1
 		}
 	}
 	return csv
-}
-
-func (r *ManagedMCGReconciler) unrestrictedGet(obj client.Object) error {
-	key := client.ObjectKeyFromObject(obj)
-	return r.UnrestrictedClient.Get(r.ctx, key, obj)
-}
-
-func (r *ManagedMCGReconciler) ensureConsolePlugin(clusterVersion string) error {
-	// The base path to where the request are sent
-	basePath := console.GetBasePath(clusterVersion)
-
-	// Get ODF console Deployment
-	odfConsoleDeployment := console.GetDeployment(r.namespace)
-	err := r.Client.Get(context.TODO(), types.NamespacedName{
-		Name:      odfConsoleDeployment.Name,
-		Namespace: odfConsoleDeployment.Namespace,
-	}, odfConsoleDeployment)
-	if err != nil {
-		return err
-	}
-
-	operatorConsole := operatorv1.Console{}
-	_ = operatorConsole
-
-	// Create/Update ODF console Service
-	odfConsoleService := console.GetService(int(9001), r.namespace)
-	_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, odfConsoleService, func() error {
-		return controllerutil.SetControllerReference(odfConsoleDeployment, odfConsoleService, r.Scheme)
-	})
-	if err != nil && !errors.IsAlreadyExists(err) {
-		return err
-	}
-
-	// Create/Update ODF console ConsolePlugin
-	odfConsolePlugin := console.GetConsolePluginCR(int(9001), basePath, r.namespace)
-	_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, odfConsolePlugin, func() error {
-		return nil
-	})
-	if err != nil && !errors.IsAlreadyExists(err) {
-		return err
-	}
-
-	return nil
 }
