@@ -116,19 +116,9 @@ func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
 
 // +kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=noobaas,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=odf.openshift.io,namespace=system,resources=storagesystems,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=ocs.openshift.io,namespace=system,resources=storageclusters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="apps",namespace=system,resources=statefulsets,verbs=get;list;watch
 // +kubebuilder:rbac:groups="storage.k8s.io",resources=storageclass,verbs=get;list;watch
 //+kubebuilder:rbac:groups=console.openshift.io,resources=consoleplugins,verbs=*
 //+kubebuilder:rbac:groups=operator.openshift.io,resources=consoles,verbs=*
-
-//+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups="apps",resources=deployments/finalizers,verbs=update
-
-//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions/finalizers,verbs=update
-//+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -370,7 +360,7 @@ func (r *ManagedMCGReconciler) reconcileODFOperatorMgrConfig() error {
 func (r *ManagedMCGReconciler) updateComponentStatus() {
 	r.Log.Info("Updating component status")
 
-	// Getting the status of the StorageCluster component.
+	// Getting the status of the Noobaa component.
 	noobaa := &r.managedMCG.Status.Components.Noobaa
 	if err := r.get(r.noobaa); err == nil {
 		if r.noobaa.Status.Phase == "Ready" {
@@ -381,7 +371,7 @@ func (r *ManagedMCGReconciler) updateComponentStatus() {
 	} else if errors.IsNotFound(err) {
 		noobaa.State = mcgv1alpha1.ComponentNotFound
 	} else {
-		r.Log.V(-1).Info("error getting StorageCluster, setting compoment status to Unknown")
+		r.Log.V(-1).Info("error getting Noobaa, setting compoment status to Unknown")
 		noobaa.State = mcgv1alpha1.ComponentUnknown
 	}
 }
