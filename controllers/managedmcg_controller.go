@@ -24,8 +24,10 @@ import (
 
 	"github.com/go-logr/logr"
 	noobaa "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	odfv1alpha1 "github.com/red-hat-data-services/odf-operator/api/v1alpha1"
+	"github.com/red-hat-data-services/odf-operator/console"
 	mcgv1alpha1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
 	"github.com/red-hat-storage/mcg-osd-deployer/templates"
 	"github.com/red-hat-storage/mcg-osd-deployer/utils"
@@ -38,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -49,8 +52,11 @@ const (
 
 	odfOperatorManagerconfigMapName = "odf-operator-manager-config"
 	noobaaName                      = "noobaa"
-	storageSystemName               = "mcg-storagecluster-storagesystem"
+	storageSystemName               = "mcg-storagesystem"
 	ManagedMCGName                  = "managedmcg"
+	odfOperatorName                 = "odf-operator"
+	operatorConsoleName             = "cluster"
+	odfConsoleName                  = "odf-console"
 )
 
 // ImageMap holds mapping information between component image name and the image url
@@ -74,6 +80,7 @@ type ManagedMCGReconciler struct {
 	noobaa                      *noobaa.NooBaa
 	storageSystem               *odfv1alpha1.StorageSystem
 	images                      ImageMap
+	operatorConsole             *operatorv1.Console
 }
 
 func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
@@ -96,6 +103,9 @@ func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
 	r.storageSystem.Name = storageSystemName
 	r.storageSystem.Namespace = r.namespace
 
+	r.operatorConsole = &operatorv1.Console{}
+	r.operatorConsole.Name = operatorConsoleName
+
 }
 
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources={managedmcg,managedmcg/finalizers},verbs=get;list;watch;create;update;patch;delete
@@ -111,6 +121,16 @@ func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
 // +kubebuilder:rbac:groups=ocs.openshift.io,namespace=system,resources=storageclusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="apps",namespace=system,resources=statefulsets,verbs=get;list;watch
 // +kubebuilder:rbac:groups="storage.k8s.io",resources=storageclass,verbs=get;list;watch
+//+kubebuilder:rbac:groups=console.openshift.io,resources=consoleplugins,verbs=*
+//+kubebuilder:rbac:groups=operator.openshift.io,resources=consoles,verbs=*
+
+//+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="apps",resources=deployments/finalizers,verbs=update
+
+//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions/finalizers,verbs=update
+//+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -159,10 +179,7 @@ func (r *ManagedMCGReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 	r.Log.Info("Reconciler phase started..&&")
-	// Uninstallation depends on the status of the components.
-	// We are checking the uninstallation condition before getting the component status
-	// to mitigate scenarios where changes to the component status occurs while the uninstallation logic is running.
-	//initiateUninstall := r.checkUninstallCondition()
+
 	// Update the status of the components
 	r.updateComponentStatus()
 
@@ -177,8 +194,7 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 			r.Log.Info("finallizer removed successfully")
 
 		} else {
-			// noobaa needs to be deleted before we delete the CSV so we can not leave it to the
-			// k8s garbage collector to delete it
+			// noobaa needs to be deleted
 			r.Log.Info("deleting noobaa")
 			if err := r.delete(r.noobaa); err != nil {
 				return ctrl.Result{}, fmt.Errorf("unable to delete nooba: %v", err)
@@ -208,17 +224,44 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 		if err := r.reconcileStorageSystem(); err != nil {
 			return ctrl.Result{}, err
 		}
+		if err := r.reconcileConsoleCluster(); err != nil {
+			return ctrl.Result{}, err
+		}
 		if err := r.reconcileNoobaa(); err != nil {
 			return ctrl.Result{}, err
 		}
-
 		r.managedMCG.Status.ReconcileStrategy = r.reconcileStrategy
 
-	} /*else if initiateUninstall {
-		return ctrl.Result{}, r.removeOLMComponents()
-	}*/
-
+	}
 	return ctrl.Result{}, nil
+}
+
+func (r *ManagedMCGReconciler) reconcileConsoleCluster() error {
+
+	consoleList := operatorv1.ConsoleList{}
+	if err := r.Client.List(r.ctx, &consoleList); err == nil {
+		for _, cluster := range consoleList.Items {
+			if utils.Contains(cluster.Spec.Plugins, odfConsoleName) {
+				r.Log.Info("Cluster instnce already exists.")
+				return nil
+			}
+		}
+	}
+
+	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.operatorConsole, func() error {
+		r.operatorConsole.Spec.Plugins = append(r.operatorConsole.Spec.Plugins, odfConsoleName)
+		return nil
+	})
+	r.Log.Info("Updqted Console resources")
+	return err
+}
+
+func (r *ManagedMCGReconciler) reconcileConsolePlugin() error {
+	if err := r.ensureConsolePlugin("4.9"); err != nil {
+		r.Log.Error(err, "Could not ensure compatibility for ODF consolePlugin")
+		return err
+	}
+	return nil
 }
 
 func (r *ManagedMCGReconciler) reconcileNoobaa() error {
@@ -307,7 +350,6 @@ func (r *ManagedMCGReconciler) reconcileStorageSystem() error {
 }
 
 func (r *ManagedMCGReconciler) getDesiredConvergedStorageSystem() (*odfv1alpha1.StorageSystem, error) {
-
 	ss := templates.StorageSystemTemplate.DeepCopy()
 	return ss, nil
 }
@@ -389,6 +431,14 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		),
 	)
 
+	odfPredicates := builder.WithPredicates(
+		predicate.NewPredicateFuncs(
+			func(client client.Object) bool {
+				return strings.HasPrefix(client.GetName(), odfOperatorName)
+			},
+		),
+	)
+
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(ctrlOptions).
 		For(&mcgv1alpha1.ManagedMCG{}, managedMCGredicates).
@@ -397,6 +447,8 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&noobaa.NooBaa{}).
 		Owns(&odfv1alpha1.StorageSystem{}).
 		Owns(&corev1.ConfigMap{}).
+		Owns(&mcgv1alpha1.ManagedMCG{}).
+		Owns(&opv1a1.ClusterServiceVersion{}).
 
 		// Watch non-owned resources
 		Watches(
@@ -411,6 +463,11 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&source.Kind{Type: &noobaa.NooBaa{}},
 			enqueueManangedMCGRequest,
+		).
+		Watches(
+			&source.Kind{Type: &opv1a1.ClusterServiceVersion{}},
+			enqueueManangedMCGRequest,
+			odfPredicates,
 		).
 		Complete(r)
 }
@@ -476,4 +533,42 @@ func getCSVByPrefix(csvList opv1a1.ClusterServiceVersionList, name string) *opv1
 func (r *ManagedMCGReconciler) unrestrictedGet(obj client.Object) error {
 	key := client.ObjectKeyFromObject(obj)
 	return r.UnrestrictedClient.Get(r.ctx, key, obj)
+}
+
+func (r *ManagedMCGReconciler) ensureConsolePlugin(clusterVersion string) error {
+	// The base path to where the request are sent
+	basePath := console.GetBasePath(clusterVersion)
+
+	// Get ODF console Deployment
+	odfConsoleDeployment := console.GetDeployment(r.namespace)
+	err := r.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      odfConsoleDeployment.Name,
+		Namespace: odfConsoleDeployment.Namespace,
+	}, odfConsoleDeployment)
+	if err != nil {
+		return err
+	}
+
+	operatorConsole := operatorv1.Console{}
+	_ = operatorConsole
+
+	// Create/Update ODF console Service
+	odfConsoleService := console.GetService(int(9001), r.namespace)
+	_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, odfConsoleService, func() error {
+		return controllerutil.SetControllerReference(odfConsoleDeployment, odfConsoleService, r.Scheme)
+	})
+	if err != nil && !errors.IsAlreadyExists(err) {
+		return err
+	}
+
+	// Create/Update ODF console ConsolePlugin
+	odfConsolePlugin := console.GetConsolePluginCR(int(9001), basePath, r.namespace)
+	_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, odfConsolePlugin, func() error {
+		return nil
+	})
+	if err != nil && !errors.IsAlreadyExists(err) {
+		return err
+	}
+
+	return nil
 }

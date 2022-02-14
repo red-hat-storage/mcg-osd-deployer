@@ -29,11 +29,11 @@ import (
 
 var StorageSystemTemplate = &odfv1alpha1.StorageSystem{
 	ObjectMeta: metav1.ObjectMeta{
-		Name:      "mcg-storagecluster-storagesystem",
+		Name:      "mcg-storagesystem",
 		Namespace: "openshift-storage",
 	},
 	Spec: odfv1alpha1.StorageSystemSpec{
-		Name:      "mcg-storagesystem",
+		Name:      "mcg-storagecluster",
 		Namespace: "openshift-storage",
 		Kind:      StorageClusterKind,
 	},

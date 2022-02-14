@@ -40,8 +40,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	noobaa "github.com/noobaa/noobaa-operator/v5/pkg/apis"
+	configv1 "github.com/openshift/api/config/v1"
+	consolev1 "github.com/openshift/api/console/v1"
+	consolev1alpha1 "github.com/openshift/api/console/v1alpha1"
+	operatorv1 "github.com/openshift/api/operator/v1"
+	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	mcgv1alpha1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
 	"github.com/red-hat-storage/mcg-osd-deployer/controllers"
+	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -71,6 +77,14 @@ func addAllSchemes(scheme *runtime.Scheme) {
 	utilruntime.Must(mcgv1alpha1.AddToScheme(scheme))
 
 	utilruntime.Must(noobaa.AddToScheme(scheme))
+
+	utilruntime.Must(consolev1.AddToScheme(scheme))
+	utilruntime.Must(consolev1alpha1.AddToScheme(scheme))
+	utilruntime.Must(configv1.AddToScheme(scheme))
+
+	utilruntime.Must(opv1a1.AddToScheme(scheme))
+	utilruntime.Must(extv1.AddToScheme(scheme))
+	utilruntime.Must(operatorv1.AddToScheme(scheme))
 
 	// +kubebuilder:scaffold:scheme
 }

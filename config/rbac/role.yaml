@@ -7,6 +7,68 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - clusterversions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - clusterversions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - clusterversions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - console.openshift.io
+  resources:
+  - consoleplugins
+  verbs:
+  - '*'
+- apiGroups:
   - mcg.openshift.io
   resources:
   - managedmcg
@@ -48,6 +110,12 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - operator.openshift.io
+  resources:
+  - consoles
+  verbs:
+  - '*'
 - apiGroups:
   - storage.k8s.io
   resources:
