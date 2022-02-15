@@ -31,6 +31,7 @@ import (
 	"github.com/red-hat-storage/mcg-osd-deployer/templates"
 	"github.com/red-hat-storage/mcg-osd-deployer/utils"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -110,15 +111,15 @@ func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources=managedmcg/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources={managedmcgs,managedmcgs/finalizers},verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources=managedmcgs/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups="",namespace=system,resources={secrets,configmaps},verbs=create;get;list;watch;update
-// +kubebuilder:rbac:groups="coordination.k8s.io",namespace=system,resources=leases,verbs=create;get;list;watch;update
-// +kubebuilder:rbac:groups=operators.coreos.com,namespace=system,resources=clusterserviceversions,verbs=get;list;watch;delete;update;patch
+//+kubebuilder:rbac:groups="",namespace=system,resources={secrets,configmaps},verbs=create;get;list;watch;update
+//+kubebuilder:rbac:groups="coordination.k8s.io",namespace=system,resources=leases,verbs=create;get;list;watch;update
+//+kubebuilder:rbac:groups=operators.coreos.com,namespace=system,resources=clusterserviceversions,verbs=get;list;watch;delete;update;patch
 
-// +kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=noobaas,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=odf.openshift.io,namespace=system,resources=storagesystems,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="storage.k8s.io",resources=storageclass,verbs=get;list;watch
+//+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=noobaas,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=odf.openshift.io,namespace=system,resources=storagesystems,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=console.openshift.io,resources=consoleplugins,verbs=*
 //+kubebuilder:rbac:groups=operator.openshift.io,resources=consoles,verbs=*
+//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -215,6 +216,9 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 		if err := r.reconcileConsoleCluster(); err != nil {
 			return ctrl.Result{}, err
 		}
+		if err := r.reconcileODFCSV(); err != nil {
+			return ctrl.Result{}, err
+		}
 		if err := r.reconcileNoobaa(); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -240,8 +244,43 @@ func (r *ManagedMCGReconciler) reconcileConsoleCluster() error {
 		r.operatorConsole.Spec.Plugins = append(r.operatorConsole.Spec.Plugins, odfConsoleName)
 		return nil
 	})
-	r.Log.Info("Updqted Console resources")
 	return err
+}
+
+func (r *ManagedMCGReconciler) reconcileODFCSV() error {
+	csvList := opv1a1.ClusterServiceVersionList{}
+	if err := r.list(&csvList); err != nil {
+		return fmt.Errorf("unable to list csv resources: %v", err)
+	}
+	csv := getCSVByPrefix(csvList, odfOperatorName)
+	if csv == nil {
+		return fmt.Errorf("ODF CSV not found")
+	}
+	var isChanged bool
+	deployments := csv.Spec.InstallStrategy.StrategySpec.DeploymentSpecs
+	for i := range deployments {
+		containers := deployments[i].Spec.Template.Spec.Containers
+		for j := range containers {
+			container := &containers[j]
+			name := container.Name
+			switch name {
+			case "manager":
+				resources := utils.GetDaemonResources("odf-operator")
+				if !equality.Semantic.DeepEqual(container.Resources, resources) {
+					container.Resources = resources
+					isChanged = true
+				}
+			default:
+				r.Log.Info("Could not find resource requirement", "Resource", container.Name)
+			}
+		}
+	}
+	if isChanged {
+		if err := r.update(csv); err != nil {
+			return fmt.Errorf("Failed to update ODF CSV with resource requirements: %v", err)
+		}
+	}
+	return nil
 }
 
 func (r *ManagedMCGReconciler) reconcileNoobaa() error {
@@ -249,8 +288,8 @@ func (r *ManagedMCGReconciler) reconcileNoobaa() error {
 	noobaList := noobaa.NooBaaList{}
 	if err := r.list(&noobaList); err == nil {
 		for _, noobaa := range noobaList.Items {
-			if noobaa.Name == "nooba" {
-				r.Log.Info("Noona instnce already exists.")
+			if noobaa.Name == noobaaName {
+				r.Log.Info("Noobaa instnce already exists.")
 				return nil
 			}
 		}
@@ -419,6 +458,22 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		),
 	)
 
+	noobaaPredicates := builder.WithPredicates(
+		predicate.NewPredicateFuncs(
+			func(client client.Object) bool {
+				return strings.HasPrefix(client.GetName(), noobaaName)
+			},
+		),
+	)
+
+	ssPredicates := builder.WithPredicates(
+		predicate.NewPredicateFuncs(
+			func(client client.Object) bool {
+				return strings.HasPrefix(client.GetName(), storageSystemName)
+			},
+		),
+	)
+
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(ctrlOptions).
 		For(&mcgv1alpha1.ManagedMCG{}, managedMCGredicates).
@@ -439,10 +494,12 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&source.Kind{Type: &odfv1alpha1.StorageSystem{}},
 			enqueueManangedMCGRequest,
+			ssPredicates,
 		).
 		Watches(
 			&source.Kind{Type: &noobaa.NooBaa{}},
 			enqueueManangedMCGRequest,
+			noobaaPredicates,
 		).
 		Watches(
 			&source.Kind{Type: &opv1a1.ClusterServiceVersion{}},
@@ -480,7 +537,7 @@ func (r *ManagedMCGReconciler) list(obj client.ObjectList) error {
 }
 
 func (r *ManagedMCGReconciler) update(obj client.Object) error {
-	return r.Client.Update(r.ctx, obj, nil)
+	return r.Client.Update(r.ctx, obj)
 }
 
 func (r *ManagedMCGReconciler) delete(obj client.Object) error {

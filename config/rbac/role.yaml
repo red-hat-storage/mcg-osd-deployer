@@ -7,6 +7,18 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - config.openshift.io
+  resources:
+  - clusterversions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - console.openshift.io
   resources:
   - consoleplugins
@@ -60,14 +72,6 @@ rules:
   - consoles
   verbs:
   - '*'
-- apiGroups:
-  - storage.k8s.io
-  resources:
-  - storageclass
-  verbs:
-  - get
-  - list
-  - watch
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
