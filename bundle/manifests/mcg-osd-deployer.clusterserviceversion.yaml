@@ -39,6 +39,18 @@ spec:
       clusterPermissions:
       - rules:
         - apiGroups:
+          - config.openshift.io
+          resources:
+          - clusterversions
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
           - console.openshift.io
           resources:
           - consoleplugins
@@ -92,14 +104,6 @@ spec:
           - consoles
           verbs:
           - '*'
-        - apiGroups:
-          - storage.k8s.io
-          resources:
-          - storageclass
-          verbs:
-          - get
-          - list
-          - watch
         serviceAccountName: deployer
       deployments:
       - name: mcg-osd-deployer-controller-manager
@@ -148,7 +152,7 @@ spec:
                   value: noobaa/noobaa-core:5.10.0-20220120
                 - name: NOOBAA_DB_IMAGE
                   value: centos/postgresql-12-centos7
-                image: quay.io/napaul/mcg-osd-deployer:v1.5
+                image: quay.io/napaul/mcg-osd-deployer:v1.7
                 name: manager
                 resources:
                   limits:
@@ -164,7 +168,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
-                image: quay.io/napaul/mcg-osd-deployer:v1.5
+                image: quay.io/napaul/mcg-osd-deployer:v1.7
                 name: readiness-server
                 readinessProbe:
                   httpGet:
