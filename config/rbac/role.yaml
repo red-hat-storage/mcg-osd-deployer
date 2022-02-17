@@ -7,18 +7,6 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - config.openshift.io
-  resources:
-  - clusterversions
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
   - console.openshift.io
   resources:
   - consoleplugins
@@ -85,7 +73,6 @@ rules:
   - ""
   resources:
   - configmaps
-  - secrets
   verbs:
   - create
   - get

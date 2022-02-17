@@ -39,18 +39,6 @@ spec:
       clusterPermissions:
       - rules:
         - apiGroups:
-          - config.openshift.io
-          resources:
-          - clusterversions
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
           - console.openshift.io
           resources:
           - consoleplugins
@@ -130,7 +118,13 @@ spec:
                 - containerPort: 8443
                   name: https
                   protocol: TCP
-                resources: {}
+                resources:
+                  limits:
+                    cpu: 50m
+                    memory: 30Mi
+                  requests:
+                    cpu: 50m
+                    memory: 30Mi
               - args:
                 - --metrics-bind-address=127.0.0.1:8080
                 - --leader-elect
@@ -142,17 +136,12 @@ spec:
                     fieldRef:
                       fieldPath: metadata.namespace
                 - name: ADDON_NAME
-                  value: ocs-converged
-                - name: SOP_ENDPOINT
-                - name: ALERT_SMTP_FROM_ADDR
-                  value: noreply-test@rhmw.io
-                - name: DEPLOYMENT_TYPE
-                  value: converged
+                  value: mcg-deployer
                 - name: NOOBAA_CORE_IMAGE
                   value: noobaa/noobaa-core:5.10.0-20220120
                 - name: NOOBAA_DB_IMAGE
                   value: centos/postgresql-12-centos7
-                image: quay.io/napaul/mcg-osd-deployer:v1.7
+                image: quay.io/napaul/mcg-osd-deployer:v1.9
                 name: manager
                 resources:
                   limits:
@@ -168,7 +157,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
-                image: quay.io/napaul/mcg-osd-deployer:v1.7
+                image: quay.io/napaul/mcg-osd-deployer:v1.9
                 name: readiness-server
                 readinessProbe:
                   httpGet:
@@ -191,7 +180,6 @@ spec:
           - ""
           resources:
           - configmaps
-          - secrets
           verbs:
           - create
           - get

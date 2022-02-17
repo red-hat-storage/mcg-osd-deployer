@@ -111,7 +111,7 @@ func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources=managedmcg/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources={managedmcgs,managedmcgs/finalizers},verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources=managedmcgs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups="",namespace=system,resources={secrets,configmaps},verbs=create;get;list;watch;update
+//+kubebuilder:rbac:groups="",namespace=system,resources=configmaps,verbs=create;get;list;watch;update
 //+kubebuilder:rbac:groups="coordination.k8s.io",namespace=system,resources=leases,verbs=create;get;list;watch;update
 //+kubebuilder:rbac:groups=operators.coreos.com,namespace=system,resources=clusterserviceversions,verbs=get;list;watch;delete;update;patch
 
@@ -119,7 +119,6 @@ func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
 //+kubebuilder:rbac:groups=odf.openshift.io,namespace=system,resources=storagesystems,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=console.openshift.io,resources=consoleplugins,verbs=*
 //+kubebuilder:rbac:groups=operator.openshift.io,resources=consoles,verbs=*
-//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

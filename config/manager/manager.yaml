@@ -42,12 +42,7 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: ADDON_NAME
-          value: ocs-converged
-        - name: SOP_ENDPOINT
-        - name: ALERT_SMTP_FROM_ADDR
-          value: noreply-test@rhmw.io
-        - name: DEPLOYMENT_TYPE
-          value: converged
+          value: mcg-deployer
         - name: NOOBAA_CORE_IMAGE
           value: noobaa/noobaa-core:5.10.0-20220120
         - name: NOOBAA_DB_IMAGE
