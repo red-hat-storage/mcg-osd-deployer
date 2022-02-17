@@ -17,21 +17,14 @@ limitations under the License.
 package templates
 
 import (
-	"reflect"
-	"strings"
-
-	odfv1alpha1 "github.com/red-hat-data-services/odf-operator/api/v1alpha1"
 	ocsv1 "github.com/red-hat-storage/ocs-operator/api/v1"
 )
 
-// StorageClusterTemplate is the template that serves as the base for the storage clsuter deployed by the operator
-
-var StorageSystemTemplate = &odfv1alpha1.StorageSystem{
-
-	Spec: odfv1alpha1.StorageSystemSpec{
-		Kind: StorageClusterKind,
+var StorageClusterTemplate = ocsv1.StorageCluster{
+	Spec: ocsv1.StorageClusterSpec{
+		MultiCloudGateway: &ocsv1.MultiCloudGatewaySpec{
+			ReconcileStrategy: "ignore",
+		},
+		Version: "4.9.0",
 	},
 }
-
-var StorageClusterKind = odfv1alpha1.StorageKind(strings.ToLower(reflect.TypeOf(ocsv1.StorageCluster{}).Name()) +
-	"." + ocsv1.GroupVersion.String())
