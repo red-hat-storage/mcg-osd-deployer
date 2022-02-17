@@ -30,6 +30,7 @@ import (
 	mcgv1alpha1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
 	"github.com/red-hat-storage/mcg-osd-deployer/templates"
 	"github.com/red-hat-storage/mcg-osd-deployer/utils"
+	ocsv1 "github.com/red-hat-storage/ocs-operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -56,6 +57,7 @@ const (
 	odfOperatorName                 = "odf-operator"
 	operatorConsoleName             = "cluster"
 	odfConsoleName                  = "odf-console"
+	storageClusterName              = "mcg-storagecluster"
 )
 
 // ImageMap holds mapping information between component image name and the image url
@@ -80,6 +82,7 @@ type ManagedMCGReconciler struct {
 	storageSystem               *odfv1alpha1.StorageSystem
 	images                      ImageMap
 	operatorConsole             *operatorv1.Console
+	storageCluster              *ocsv1.StorageCluster
 }
 
 func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
@@ -105,6 +108,10 @@ func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
 	r.operatorConsole = &operatorv1.Console{}
 	r.operatorConsole.Name = operatorConsoleName
 
+	r.storageCluster = &ocsv1.StorageCluster{}
+	r.storageCluster.Name = storageClusterName
+	r.storageCluster.Namespace = r.namespace
+
 }
 
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources={managedmcg,managedmcg/finalizers},verbs=get;list;watch;create;update;patch;delete
@@ -114,6 +121,7 @@ func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
 //+kubebuilder:rbac:groups="",namespace=system,resources=configmaps,verbs=create;get;list;watch;update
 //+kubebuilder:rbac:groups="coordination.k8s.io",namespace=system,resources=leases,verbs=create;get;list;watch;update
 //+kubebuilder:rbac:groups=operators.coreos.com,namespace=system,resources=clusterserviceversions,verbs=get;list;watch;delete;update;patch
+// +kubebuilder:rbac:groups=ocs.openshift.io,namespace=system,resources=storageclusters,verbs=get;list;watch;create;update
 
 //+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=noobaas,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=odf.openshift.io,namespace=system,resources=storagesystems,verbs=get;list;watch;create;update;patch;delete
@@ -209,10 +217,10 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 		if err := r.reconcileODFOperatorMgrConfig(); err != nil {
 			return ctrl.Result{}, err
 		}
-		if err := r.reconcileStorageSystem(); err != nil {
+		if err := r.reconcileConsoleCluster(); err != nil {
 			return ctrl.Result{}, err
 		}
-		if err := r.reconcileConsoleCluster(); err != nil {
+		if err := r.reconcileStorageSystem(); err != nil {
 			return ctrl.Result{}, err
 		}
 		if err := r.reconcileODFCSV(); err != nil {
@@ -221,10 +229,27 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 		if err := r.reconcileNoobaa(); err != nil {
 			return ctrl.Result{}, err
 		}
+		if err := r.reconcileStorageCluster(); err != nil {
+			return ctrl.Result{}, err
+		}
 		r.managedMCG.Status.ReconcileStrategy = r.reconcileStrategy
 
 	}
 	return ctrl.Result{}, nil
+}
+
+func (r *ManagedMCGReconciler) reconcileStorageCluster() error {
+	r.Log.Info("Reconciling StorageCluster")
+	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.storageCluster, func() error {
+		sc := templates.StorageClusterTemplate.DeepCopy()
+		r.storageCluster.Spec = sc.Spec
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *ManagedMCGReconciler) reconcileConsoleCluster() error {
@@ -369,6 +394,8 @@ func (r *ManagedMCGReconciler) reconcileStorageSystem() error {
 
 func (r *ManagedMCGReconciler) getDesiredConvergedStorageSystem() (*odfv1alpha1.StorageSystem, error) {
 	ss := templates.StorageSystemTemplate.DeepCopy()
+	ss.Spec.Name = storageClusterName
+	ss.Spec.Namespace = r.namespace
 	return ss, nil
 }
 
