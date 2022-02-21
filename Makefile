@@ -1,3 +1,5 @@
+include shim/.env
+
 # Current Operator version
 VERSION ?= 1.1.3
 # Default bundle image tag
@@ -33,13 +35,6 @@ ARCH = $(shell go env GOARCH)
 
 all: manager readinessServer
 
-export_env_vars:
-export NAMESPACE = openshift-storage
-export ADDON_NAME = ocs-converged
-export SOP_ENDPOINT = https://red-hat-storage.github.io/ocs-sop/sop/OSD/{{ .GroupLabels.alertname }}.html
-export ALERT_SMTP_FROM_ADDR = noreply-test@test.com
-export DEPLOYMENT_TYPE = converged
-
 # Run tests
 ENVTEST_ASSETS_DIR = $(shell pwd)/testbin
 test: generate fmt vet manifests
@@ -56,43 +51,63 @@ readinessServer: fmt vet
 	go build -o bin/readinessServer readinessProbe/main.go
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
-run: generate fmt vet manifests export_env_vars
-	kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
-	kubectl create secret generic addon-${ADDON_NAME}-parameters -n ${NAMESPACE} --from-literal size=1 --from-literal enable-mcg=false --dry-run=client -oyaml | kubectl apply -f -
-	kubectl create secret generic ${ADDON_NAME}-pagerduty -n ${NAMESPACE} --from-literal PAGERDUTY_KEY="test-key" --dry-run=client -oyaml | kubectl apply -f -
-	kubectl create secret generic ${ADDON_NAME}-deadmanssnitch -n ${NAMESPACE} --from-literal SNITCH_URL="https://test-url" --dry-run=client -oyaml | kubectl apply -f -
-	kubectl create secret generic ${ADDON_NAME}-smtp -n ${NAMESPACE} --from-literal host="smtp.sendgrid.net" --from-literal password="test-key" --from-literal port="587" \
-	--from-literal username="apikey" --dry-run=client -oyaml | kubectl apply -f -
-	kubectl create configmap rook-ceph-operator-config -n ${NAMESPACE} --dry-run=client -oyaml | kubectl apply -f -
-	echo -e "apiVersion: operators.coreos.com/v1alpha1" \
-	      "\nkind: ClusterServiceVersion" \
-		  "\nmetadata:" \
-		  "\n  name: ocs-operator-0.1" \
-		  "\n  namespace: ${NAMESPACE}" \
-		  "\nspec:" \
-		  "\n  displayName: ocs operator" \
-		  "\n  install:" \
-		  "\n    spec:" \
-		  "\n      deployments:" \
-		  "\n      - name: test" \
-		  "\n        spec:" \
-		  "\n          selector:" \
-		  "\n            matchLabels:" \
-		  "\n              app: test" \
-		  "\n          template:" \
-		  "\n            metadata:" \
-		  "\n              labels:" \
-		  "\n                app: test" \
-		  "\n            spec:" \
-		  "\n              containers:" \
-		  "\n              - name: test" \
-		  "\n    strategy: deployment" | kubectl apply -f -
-	go run ./main.go
+run: generate fmt vet manifests
+	NAMESPACE=${NAMESPACE} ADDON_NAME=${ADDON_NAME} go run ./main.go
 
 # Install CRDs into a cluster
 install: manifests kustomize
 	$(KUSTOMIZE) build config/crd | kubectl apply -f -
 	./shim/shim.sh install
+	kubectl create configmap rook-ceph-operator-config -n ${NAMESPACE} --dry-run=client -oyaml | kubectl apply -f -
+	echo -e \
+	"\napiVersion: v1" \
+	"\nkind: Namespace" \
+	"\nmetadata:" \
+	"\n  labels:" \
+	"\n    openshift.io/cluster-monitoring: \"true\"" \
+	"\n  name: ${NAMESPACE}" \
+	"\nspec: {}" \
+	"\n---" \
+	"\napiVersion: operators.coreos.com/v1" \
+	"\nkind: OperatorGroup" \
+	"\nmetadata:" \
+	"\n  name: ${NAMESPACE}-operatorgroup" \
+	"\n  namespace: ${NAMESPACE}" \
+	"\nspec:" \
+	"\n  targetNamespaces:" \
+	"\n  - ${NAMESPACE}" \
+	"\n---" \
+	"\napiVersion: operators.coreos.com/v1alpha1" \
+	"\nkind: CatalogSource" \
+	"\nmetadata:" \
+	"\n  labels:" \
+	"\n    ocs-operator-internal: 'true'" \
+	"\n  name: redhat-operators" \
+	"\n  namespace: openshift-marketplace" \
+	"\nspec:" \
+	"\n  displayName: Openshift Data Foundation" \
+	"\n  icon:" \
+	"\n    base64data: ''" \
+	"\n    mediatype: ''" \
+	"\n  image: ${ODF_IMAGE}" \
+	"\n  priority: 100" \
+	"\n  publisher: Red Hat" \
+	"\n  sourceType: grpc" \
+	"\n  updateStrategy:" \
+	"\n    registryPoll:" \
+	"\n      interval: 15m" \
+	"\n---" \
+	"\napiVersion: operators.coreos.com/v1alpha1" \
+	"\nkind: Subscription" \
+	"\nmetadata:" \
+	"\n  name: odf-subscription" \
+	"\n  namespace: ${NAMESPACE}" \
+	"\nspec:" \
+	"\n  channel: ${CHANNEL}" \
+	"\n  name: odf-operator" \
+	"\n  source: redhat-operators" \
+	"\n  sourceNamespace: openshift-marketplace" | \
+	kubectl apply -f -
 
 # Uninstall CRDs from a cluster
 uninstall: manifests kustomize
