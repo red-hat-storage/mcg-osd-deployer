@@ -96,6 +96,7 @@ func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
 	r.odfOperatorManagerconfigMap = &corev1.ConfigMap{}
 	r.odfOperatorManagerconfigMap.Name = odfOperatorManagerconfigMapName
 	r.odfOperatorManagerconfigMap.Namespace = r.namespace
+	r.odfOperatorManagerconfigMap.Data = make(map[string]string)
 
 	r.noobaa = &noobaa.NooBaa{}
 	r.noobaa.Name = noobaaName
