@@ -49,6 +49,7 @@ import (
 
 const (
 	ManagedMCGFinalizer = "managedmcg.openshift.io"
+	NoobaaFinalizer     = "noobaa.io/graceful_finalizer"
 
 	odfOperatorManagerconfigMapName = "odf-operator-manager-config"
 	noobaaName                      = "noobaa"
@@ -58,6 +59,8 @@ const (
 	operatorConsoleName             = "cluster"
 	odfConsoleName                  = "odf-console"
 	storageClusterName              = "mcg-storagecluster"
+	deployerCSVPrefix               = "mcg-osd-deployer"
+	noobaaOperatorName              = "noobaa-operator"
 )
 
 // ImageMap holds mapping information between component image name and the image url
@@ -83,6 +86,9 @@ type ManagedMCGReconciler struct {
 	images                      ImageMap
 	operatorConsole             *operatorv1.Console
 	storageCluster              *ocsv1.StorageCluster
+
+	AddonConfigMapName           string
+	AddonConfigMapDeleteLabelKey string
 }
 
 func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
@@ -112,7 +118,6 @@ func (r *ManagedMCGReconciler) initReconciler(req ctrl.Request) {
 	r.storageCluster = &ocsv1.StorageCluster{}
 	r.storageCluster.Name = storageClusterName
 	r.storageCluster.Namespace = r.namespace
-
 }
 
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources={managedmcg,managedmcg/finalizers},verbs=get;list;watch;create;update;patch;delete
@@ -159,6 +164,7 @@ func (r *ManagedMCGReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// Ensure status is updated once even on failed reconciles
+
 	var statusErr error
 	if r.managedMCG.UID != "" {
 		statusErr = r.Client.Status().Update(r.ctx, r.managedMCG)
@@ -177,6 +183,7 @@ func (r *ManagedMCGReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 	r.Log.Info("Reconciler phase started..&&")
 
+	initiateUninstall := r.checkUninstallCondition()
 	// Update the status of the components
 	r.updateComponentStatus()
 
@@ -184,18 +191,47 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 		r.Log.Info("removing managedMCG resource if DeletionTimestamp exceeded")
 		if r.verifyComponentsDoNotExist() {
 			r.Log.Info("removing finalizer from the ManagedMCG resource")
-			r.managedMCG.SetFinalizers(utils.Remove(r.managedMCG.GetFinalizers(), ManagedMCGFinalizer))
+
+			// Deleting Noobaa CSV from the namespace
+			/*r.Log.Info("deleting Noobaa CSV")
+			if csv, err := r.getCSVByPrefix(noobaaOperatorName); err == nil {
+				if err := r.delete(csv); err != nil {
+					return ctrl.Result{}, fmt.Errorf("unable to delete csv: %v", err)
+				}
+			} else {
+				return ctrl.Result{}, err
+			}*/
+
+			r.managedMCG.SetFinalizers(utils.Remove(r.managedMCG.Finalizers, ManagedMCGFinalizer))
 			if err := r.Client.Update(r.ctx, r.managedMCG); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to remove finalizer from ManagedMCG: %v", err)
 			}
 			r.Log.Info("finallizer removed successfully")
 
 		} else {
+
 			// noobaa needs to be deleted
 			r.Log.Info("deleting noobaa")
+			r.noobaa.SetFinalizers(utils.Remove(r.noobaa.GetFinalizers(), NoobaaFinalizer))
+			if err := r.Client.Update(r.ctx, r.noobaa); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to remove finalizer from Noobaa: %v", err)
+			}
+
 			if err := r.delete(r.noobaa); err != nil {
 				return ctrl.Result{}, fmt.Errorf("unable to delete nooba: %v", err)
 			}
+
+			/*r.Log.Info("deleting storagecluster")
+			if err := r.delete(r.storageCluster); err != nil {
+				return ctrl.Result{}, fmt.Errorf("unable to delete storagecluster: %v", err)
+			}*/
+
+			// Deleting all storage systems from the namespace
+			r.Log.Info("deleting storageSystems")
+			if err := r.delete(r.storageSystem); err != nil {
+				return ctrl.Result{}, fmt.Errorf("unable to delete storageSystem: %v", err)
+			}
+
 		}
 
 	} else if r.managedMCG.UID != "" {
@@ -215,28 +251,85 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 		}
 
 		// Reconcile the different resources
-		if err := r.reconcileODFOperatorMgrConfig(); err != nil {
+		//TODO : remove once ODF upgrad to 4.10
+		/*if err := r.reconcileODFOperatorMgrConfig(); err != nil {
 			return ctrl.Result{}, err
-		}
+		}*/
 		if err := r.reconcileConsoleCluster(); err != nil {
 			return ctrl.Result{}, err
 		}
 		if err := r.reconcileStorageSystem(); err != nil {
 			return ctrl.Result{}, err
 		}
-		if err := r.reconcileODFCSV(); err != nil {
+		//TODO : remove once ODF upgrad to 4.10
+		/*if err := r.reconcileODFCSV(); err != nil {
 			return ctrl.Result{}, err
-		}
+		}*/
 		if err := r.reconcileNoobaa(); err != nil {
 			return ctrl.Result{}, err
 		}
+		//TODO : remove once ODF upgrad to 4.10
 		if err := r.reconcileStorageCluster(); err != nil {
 			return ctrl.Result{}, err
 		}
 		r.managedMCG.Status.ReconcileStrategy = r.reconcileStrategy
 
+		// Check if we need and can uninstall
+		if initiateUninstall && r.areComponentsReadyForUninstall() {
+
+			r.Log.Info("starting MCG uninstallation - deleting managedMCG")
+			if err := r.delete(r.managedMCG); err != nil {
+				return ctrl.Result{}, fmt.Errorf("unable to delete managedMCG: %v", err)
+			}
+
+			if err := r.get(r.managedMCG); err != nil {
+				if !errors.IsNotFound(err) {
+					return ctrl.Result{}, err
+				}
+				r.Log.V(-1).Info("Trying to reload managedMCG resource after delete failed, managedMCG resource not found")
+			}
+		}
+
+	} else if initiateUninstall {
+		return ctrl.Result{}, r.removeOLMComponents()
 	}
 	return ctrl.Result{}, nil
+}
+
+func (r *ManagedMCGReconciler) removeOLMComponents() error {
+
+	r.Log.Info("deleting deployer csv")
+	if csv, err := r.getCSVByPrefix(deployerCSVPrefix); err == nil {
+		if err := r.delete(csv); err != nil {
+			return fmt.Errorf("Unable to delete csv: %v", err)
+		} else {
+			r.Log.Info("Deployer csv removed successfully")
+			return nil
+		}
+	} else {
+		return err
+	}
+}
+
+func (r *ManagedMCGReconciler) areComponentsReadyForUninstall() bool {
+	subComponents := r.managedMCG.Status.Components
+	return subComponents.Noobaa.State == mcgv1alpha1.ComponentReady
+}
+
+func (r *ManagedMCGReconciler) checkUninstallCondition() bool {
+	configmap := &corev1.ConfigMap{}
+	configmap.Name = r.AddonConfigMapName
+	configmap.Namespace = r.namespace
+
+	err := r.get(configmap)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			r.Log.Error(err, "Unable to get addon delete configmap")
+		}
+		return false
+	}
+	_, ok := configmap.Labels[r.AddonConfigMapDeleteLabelKey]
+	return ok
 }
 
 func (r *ManagedMCGReconciler) reconcileStorageCluster() error {
@@ -273,13 +366,10 @@ func (r *ManagedMCGReconciler) reconcileConsoleCluster() error {
 }
 
 func (r *ManagedMCGReconciler) reconcileODFCSV() error {
-	csvList := opv1a1.ClusterServiceVersionList{}
-	if err := r.list(&csvList); err != nil {
-		return fmt.Errorf("unable to list csv resources: %v", err)
-	}
-	csv := getCSVByPrefix(csvList, odfOperatorName)
-	if csv == nil {
-		return fmt.Errorf("ODF CSV not found")
+	var csv *opv1a1.ClusterServiceVersion
+	var err error
+	if csv, err = r.getCSVByPrefix(odfOperatorName); err != nil {
+		return err
 	}
 	var isChanged bool
 	deployments := csv.Spec.InstallStrategy.StrategySpec.DeploymentSpecs
@@ -353,11 +443,7 @@ func (r *ManagedMCGReconciler) setNooBaaDesiredState(desiredNooba *noobaa.NooBaa
 		MinCount:               1,
 		MaxCount:               2,
 		AdditionalVirtualHosts: []string{},
-
-		// TODO: After spec.resources["noobaa-endpoint"] is decleared obesolete this
-		// definition should hold a constant value. and should not be read from
-		// GetDaemonResources()
-		Resources: &endpointResources,
+		Resources:              &endpointResources,
 	}
 
 	return nil
@@ -471,6 +557,10 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				name := client.GetName()
 				if name == odfOperatorManagerconfigMapName {
 					return true
+				} else if name == r.AddonConfigMapName {
+					if _, ok := client.GetLabels()[r.AddonConfigMapDeleteLabelKey]; ok {
+						return true
+					}
 				}
 				return false
 			},
@@ -506,11 +596,9 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&mcgv1alpha1.ManagedMCG{}, managedMCGredicates).
 
 		// Watch owned resources
+		Owns(&ocsv1.StorageCluster{}).
 		Owns(&noobaa.NooBaa{}).
 		Owns(&odfv1alpha1.StorageSystem{}).
-		Owns(&corev1.ConfigMap{}).
-		Owns(&mcgv1alpha1.ManagedMCG{}).
-		Owns(&opv1a1.ClusterServiceVersion{}).
 
 		// Watch non-owned resources
 		Watches(
@@ -542,11 +630,11 @@ func (r *ManagedMCGReconciler) initializeImageVars() error {
 
 	if r.images.NooBaaCore == "" {
 		err := fmt.Errorf("NOOBAA_CORE_IMAGE environment variable not found")
-		r.Log.Error(err, "Missing NOOBAA_CORE_IMAGE environment variable for ocs initialization.")
+		r.Log.Error(err, "Missing NOOBAA_CORE_IMAGE environment variable for MCG initialization.")
 		return err
 	} else if r.images.NooBaaDB == "" {
 		err := fmt.Errorf("NOOBAA_DB_IMAGE environment variable not found")
-		r.Log.Error(err, "Missing NOOBAA_DB_IMAGE environment variable for ocs initialization.")
+		r.Log.Error(err, "Missing NOOBAA_DB_IMAGE environment variable for MCG initialization.")
 		return err
 	}
 	return nil
@@ -582,14 +670,20 @@ func (r *ManagedMCGReconciler) own(resource metav1.Object) error {
 	return nil
 }
 
-func getCSVByPrefix(csvList opv1a1.ClusterServiceVersionList, name string) *opv1a1.ClusterServiceVersion {
+func (r *ManagedMCGReconciler) getCSVByPrefix(name string) (*opv1a1.ClusterServiceVersion, error) {
+	csvList := opv1a1.ClusterServiceVersionList{}
+	if err := r.list(&csvList); err != nil {
+		return nil, fmt.Errorf("unable to list csv resources: %v", err)
+	}
 	var csv *opv1a1.ClusterServiceVersion = nil
-	for index := range csvList.Items {
-		candidate := &csvList.Items[index]
+	for _, candidate := range csvList.Items {
 		if strings.HasPrefix(candidate.Name, name) {
-			csv = candidate
+			csv = &candidate
 			break
 		}
 	}
-	return csv
+	if csv == nil {
+		return nil, fmt.Errorf("unable to get csv resources for %s ", name)
+	}
+	return csv, nil
 }

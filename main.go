@@ -114,13 +114,14 @@ func main() {
 		setupLog.Error(err, "unable to start manager.")
 		os.Exit(1)
 	}
-
+	addonName := envVars[addonNameEnvVarName]
 	if err = (&controllers.ManagedMCGReconciler{
-
-		Client:             mgr.GetClient(),
-		UnrestrictedClient: getUnrestrictedClient(),
-		Log:                ctrl.Log.WithName("controllers").WithName("ManagedMCG"),
-		Scheme:             mgr.GetScheme(),
+		Client:                       mgr.GetClient(),
+		UnrestrictedClient:           getUnrestrictedClient(),
+		Log:                          ctrl.Log.WithName("controllers").WithName("ManagedMCG"),
+		Scheme:                       mgr.GetScheme(),
+		AddonConfigMapName:           addonName,
+		AddonConfigMapDeleteLabelKey: fmt.Sprintf("api.openshift.com/addon-%v-delete", addonName),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ManagedMCG")
 		os.Exit(1)
