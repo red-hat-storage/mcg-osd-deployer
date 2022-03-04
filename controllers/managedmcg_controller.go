@@ -164,7 +164,6 @@ func (r *ManagedMCGReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// Ensure status is updated once even on failed reconciles
-
 	var statusErr error
 	if r.managedMCG.UID != "" {
 		statusErr = r.Client.Status().Update(r.ctx, r.managedMCG)
@@ -192,16 +191,6 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 		if r.verifyComponentsDoNotExist() {
 			r.Log.Info("removing finalizer from the ManagedMCG resource")
 
-			// Deleting Noobaa CSV from the namespace
-			/*r.Log.Info("deleting Noobaa CSV")
-			if csv, err := r.getCSVByPrefix(noobaaOperatorName); err == nil {
-				if err := r.delete(csv); err != nil {
-					return ctrl.Result{}, fmt.Errorf("unable to delete csv: %v", err)
-				}
-			} else {
-				return ctrl.Result{}, err
-			}*/
-
 			r.managedMCG.SetFinalizers(utils.Remove(r.managedMCG.Finalizers, ManagedMCGFinalizer))
 			if err := r.Client.Update(r.ctx, r.managedMCG); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to remove finalizer from ManagedMCG: %v", err)
@@ -220,11 +209,6 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 			if err := r.delete(r.noobaa); err != nil {
 				return ctrl.Result{}, fmt.Errorf("unable to delete nooba: %v", err)
 			}
-
-			/*r.Log.Info("deleting storagecluster")
-			if err := r.delete(r.storageCluster); err != nil {
-				return ctrl.Result{}, fmt.Errorf("unable to delete storagecluster: %v", err)
-			}*/
 
 			// Deleting all storage systems from the namespace
 			r.Log.Info("deleting storageSystems")
@@ -252,9 +236,9 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 
 		// Reconcile the different resources
 		//TODO : remove once ODF upgrad to 4.10
-		/*if err := r.reconcileODFOperatorMgrConfig(); err != nil {
+		if err := r.reconcileODFOperatorMgrConfig(); err != nil {
 			return ctrl.Result{}, err
-		}*/
+		}
 		if err := r.reconcileConsoleCluster(); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -262,9 +246,9 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 			return ctrl.Result{}, err
 		}
 		//TODO : remove once ODF upgrad to 4.10
-		/*if err := r.reconcileODFCSV(); err != nil {
+		if err := r.reconcileODFCSV(); err != nil {
 			return ctrl.Result{}, err
-		}*/
+		}
 		if err := r.reconcileNoobaa(); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -342,7 +326,6 @@ func (r *ManagedMCGReconciler) reconcileStorageCluster() error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -409,37 +392,37 @@ func (r *ManagedMCGReconciler) reconcileNoobaa() error {
 			}
 		}
 	}
-	desiredNooba := templates.NoobaTemplate.DeepCopy()
-	err := r.setNooBaaDesiredState(desiredNooba)
+	desiredNoobaa := templates.NoobaTemplate.DeepCopy()
+	err := r.setNooBaaDesiredState(desiredNoobaa)
 	_, err = ctrl.CreateOrUpdate(r.ctx, r.Client, r.noobaa, func() error {
 		if err := r.own(r.storageSystem); err != nil {
 			return err
 		}
-		r.noobaa.Spec = desiredNooba.Spec
+		r.noobaa.Spec = desiredNoobaa.Spec
 		return nil
 	})
 	return err
 }
 
-func (r *ManagedMCGReconciler) setNooBaaDesiredState(desiredNooba *noobaa.NooBaa) error {
+func (r *ManagedMCGReconciler) setNooBaaDesiredState(desiredNoobaa *noobaa.NooBaa) error {
 	coreResources := utils.GetDaemonResources("noobaa-core")
 	dbResources := utils.GetDaemonResources("noobaa-db")
 	dBVolumeResources := utils.GetDaemonResources("noobaa-db-vol")
 	endpointResources := utils.GetDaemonResources("noobaa-endpoint")
 
-	desiredNooba.Labels = map[string]string{
+	desiredNoobaa.Labels = map[string]string{
 		"app": "noobaa",
 	}
-	desiredNooba.Spec.CoreResources = &coreResources
-	desiredNooba.Spec.DBResources = &dbResources
+	desiredNoobaa.Spec.CoreResources = &coreResources
+	desiredNoobaa.Spec.DBResources = &dbResources
 
-	desiredNooba.Spec.DBVolumeResources = &dBVolumeResources
-	desiredNooba.Spec.Image = &r.images.NooBaaCore
-	desiredNooba.Spec.DBImage = &r.images.NooBaaDB
-	desiredNooba.Spec.DBType = noobaa.DBTypePostgres
+	desiredNoobaa.Spec.DBVolumeResources = &dBVolumeResources
+	desiredNoobaa.Spec.Image = &r.images.NooBaaCore
+	desiredNoobaa.Spec.DBImage = &r.images.NooBaaDB
+	desiredNoobaa.Spec.DBType = noobaa.DBTypePostgres
 
 	// Default endpoint spec.
-	desiredNooba.Spec.Endpoints = &noobaa.EndpointsSpec{
+	desiredNoobaa.Spec.Endpoints = &noobaa.EndpointsSpec{
 		MinCount:               1,
 		MaxCount:               2,
 		AdditionalVirtualHosts: []string{},
@@ -511,7 +494,6 @@ func (r *ManagedMCGReconciler) reconcileODFOperatorMgrConfig() error {
 
 func (r *ManagedMCGReconciler) updateComponentStatus() {
 	r.Log.Info("Updating component status")
-
 	// Getting the status of the Noobaa component.
 	noobaa := &r.managedMCG.Status.Components.Noobaa
 	if err := r.get(r.noobaa); err == nil {
