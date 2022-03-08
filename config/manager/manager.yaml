@@ -42,11 +42,11 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: ADDON_NAME
-          value: mcg-deployer
+          value: mcg-osd
         - name: NOOBAA_CORE_IMAGE
-          value: noobaa/noobaa-core:5.10.0-20220120
+          value: quay.io/noobaa/noobaa-core:5.9-20220206
         - name: NOOBAA_DB_IMAGE
-          value: centos/postgresql-12-centos7
+          value: quay.io/centos7/postgresql-12-centos7:centos7
       - name: readiness-server
         command:
         - /readinessServer
