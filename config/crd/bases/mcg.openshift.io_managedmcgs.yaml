@@ -37,8 +37,6 @@ spec:
             description: ManagedMCGSpec defines the desired state of ManagedMCG
             properties:
               reconcileStrategy:
-                description: ReconcileStrategy represent the action the deployer should
-                  take whenever a recncile event occures
                 type: string
             type: object
           status:
@@ -46,22 +44,7 @@ spec:
             properties:
               components:
                 properties:
-                  alertmanager:
-                    properties:
-                      state:
-                        type: string
-                    required:
-                    - state
-                    type: object
                   noobaa:
-                    description: StorageCluster ComponentStatus `json:"StorageCluster"`
-                    properties:
-                      state:
-                        type: string
-                    required:
-                    - state
-                    type: object
-                  prometheus:
                     properties:
                       state:
                         type: string
@@ -69,13 +52,9 @@ spec:
                     - state
                     type: object
                 required:
-                - alertmanager
                 - noobaa
-                - prometheus
                 type: object
               reconcileStrategy:
-                description: ReconcileStrategy represent the action the deployer should
-                  take whenever a recncile event occures
                 type: string
             required:
             - components

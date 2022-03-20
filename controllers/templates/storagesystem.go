@@ -1,5 +1,5 @@
 /*
-
+Copyright 2022.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,10 +24,7 @@ import (
 	ocsv1 "github.com/red-hat-storage/ocs-operator/api/v1"
 )
 
-// StorageClusterTemplate is the template that serves as the base for the storage clsuter deployed by the operator
-
 var StorageSystemTemplate = &odfv1alpha1.StorageSystem{
-
 	Spec: odfv1alpha1.StorageSystemSpec{
 		Kind: StorageClusterKind,
 	},

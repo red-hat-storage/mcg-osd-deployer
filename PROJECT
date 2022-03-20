@@ -1,4 +1,4 @@
-domain: mcg.openshift.io
+domain: openshift.io
 layout:
 - go.kubebuilder.io/v3
 plugins:
@@ -11,7 +11,8 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: mcg.openshift.io
+  domain: openshift.io
+  group: mcg
   kind: ManagedMCG
   path: github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1
   version: v1alpha1

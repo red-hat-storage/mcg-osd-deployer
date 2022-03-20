@@ -7,33 +7,6 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - console.openshift.io
-  resources:
-  - consoleplugins
-  verbs:
-  - '*'
-- apiGroups:
-  - mcg.openshift.io
-  resources:
-  - managedmcg
-  - managedmcg/finalizers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - mcg.openshift.io
-  resources:
-  - managedmcg/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
   - mcg.openshift.io
   resources:
   - managedmcgs
@@ -59,7 +32,11 @@ rules:
   resources:
   - consoles
   verbs:
-  - '*'
+  - create
+  - get
+  - list
+  - update
+  - watch
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -95,10 +72,8 @@ rules:
   - noobaas
   verbs:
   - create
-  - delete
   - get
   - list
-  - patch
   - update
   - watch
 - apiGroups:
@@ -117,10 +92,8 @@ rules:
   - storagesystems
   verbs:
   - create
-  - delete
   - get
   - list
-  - patch
   - update
   - watch
 - apiGroups:
@@ -128,9 +101,7 @@ rules:
   resources:
   - clusterserviceversions
   verbs:
-  - delete
   - get
   - list
-  - patch
   - update
   - watch
