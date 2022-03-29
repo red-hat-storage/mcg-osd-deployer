@@ -19,8 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"github.com/red-hat-storage/mcg-osd-deployer/controllers/readyz"
-	"github.com/red-hat-storage/mcg-osd-deployer/controllers/templates"
+	"github.com/red-hat-storage/mcg-osd-deployer/templates"
 	"os"
 	"strings"
 
@@ -128,7 +127,6 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 func (r *ManagedMCGReconciler) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("req.Namespace", req.Namespace, "req.Name", req.Name)
 	log.Info("starting reconciliation for ManagedMCG")
-	readyz.SetReadiness()
 	r.initializeReconciler(req)
 	if err := r.get(r.managedMCG); err != nil {
 		if errors.IsNotFound(err) {
@@ -147,10 +145,8 @@ func (r *ManagedMCGReconciler) Reconcile(_ context.Context, req ctrl.Request) (c
 	}
 	// Reconcile errors have priority to status update errors
 	if err != nil {
-		readyz.UnsetReadiness()
 		return ctrl.Result{}, err
 	} else if statusErr != nil {
-		readyz.UnsetReadiness()
 		return ctrl.Result{}, statusErr
 	} else {
 		return result, nil
@@ -202,7 +198,7 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 		if err := r.reconcileConsole(); err != nil {
 			return ctrl.Result{}, err
 		}
-		if err := r.reconcileNoobaa(); err != nil {
+		if err := r.reconcileNoobaaComponent(); err != nil {
 			return ctrl.Result{}, err
 		}
 		if err := r.reconcileODFCSV(); err != nil {
@@ -311,11 +307,11 @@ func (r *ManagedMCGReconciler) reconcileODFCSV() error {
 	return nil
 }
 
-func (r *ManagedMCGReconciler) reconcileNoobaa() error {
+func (r *ManagedMCGReconciler) reconcileNoobaaComponent() error {
 	r.Log.Info("reconciling Noobaa")
 	desiredNoobaa := templates.NoobaaTemplate.DeepCopy()
-	err := r.setNoobaaDesiredState(desiredNoobaa)
-	_, err = ctrl.CreateOrUpdate(r.ctx, r.Client, r.noobaa, func() error {
+	r.setNoobaaDesiredState(desiredNoobaa)
+	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.noobaa, func() error {
 		r.Log.Info("creating/updating Noobaa CR", "name", noobaaName)
 		r.noobaa.Spec = desiredNoobaa.Spec
 		return nil
@@ -323,7 +319,7 @@ func (r *ManagedMCGReconciler) reconcileNoobaa() error {
 	return err
 }
 
-func (r *ManagedMCGReconciler) setNoobaaDesiredState(desiredNoobaa *noobaav1alpha1.NooBaa) error {
+func (r *ManagedMCGReconciler) setNoobaaDesiredState(desiredNoobaa *noobaav1alpha1.NooBaa) {
 	coreResources := GetDaemonResources("noobaa-core")
 	dbResources := GetDaemonResources("noobaa-db")
 	dBVolumeResources := GetDaemonResources("noobaa-db-vol")
@@ -343,7 +339,6 @@ func (r *ManagedMCGReconciler) setNoobaaDesiredState(desiredNoobaa *noobaav1alph
 		AdditionalVirtualHosts: []string{},
 		Resources:              &endpointResources,
 	}
-	return nil
 }
 
 func (r *ManagedMCGReconciler) reconcileStorageSystem() error {
@@ -360,10 +355,8 @@ func (r *ManagedMCGReconciler) reconcileStorageSystem() error {
 	if err != nil {
 		return err
 	}
-	if err := r.own(r.storageSystem); err != nil {
-		return err
-	}
-	return nil
+	err = r.own(r.storageSystem)
+	return err
 }
 
 func (r *ManagedMCGReconciler) reconcileODFOperatorManagerConfigMap() error {
@@ -392,7 +385,6 @@ func (r *ManagedMCGReconciler) updateNoobaaComponentStatus() {
 		noobaaComponent.State = mcgv1alpha1.ComponentNotFound
 	} else {
 		r.Log.Info("Could not fetch Noobaa CR")
-		readyz.UnsetReadiness()
 		noobaaComponent.State = mcgv1alpha1.ComponentUnknown
 	}
 }

@@ -14,7 +14,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    operators.operatorframework.io/builder: operator-sdk-v1.15.0+git
+    operators.operatorframework.io/builder: operator-sdk-v1.18.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: mcg-osd-deployer.v1.0.0
   namespace: placeholder
@@ -117,6 +117,22 @@ spec:
                   value: quay.io/centos7/postgresql-12-centos7:centos7
                 image: quay.io/red-hat-storage/mcg-osd-deployer:latest
                 name: manager
+                resources:
+                  limits:
+                    cpu: 100m
+                    memory: 200Mi
+                  requests:
+                    cpu: 100m
+                    memory: 200Mi
+              - command:
+                - /readinessServer
+                env:
+                - name: NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                image: quay.io/red-hat-storage/mcg-osd-deployer:latest
+                name: readiness-server
                 readinessProbe:
                   httpGet:
                     path: /readyz
@@ -126,10 +142,10 @@ spec:
                 resources:
                   limits:
                     cpu: 100m
-                    memory: 200Mi
+                    memory: 30Mi
                   requests:
                     cpu: 100m
-                    memory: 200Mi
+                    memory: 30Mi
               serviceAccountName: deployer
               terminationGracePeriodSeconds: 10
       permissions:

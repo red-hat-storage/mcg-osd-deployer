@@ -21,7 +21,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/red-hat-storage/mcg-osd-deployer/controllers"
-	"github.com/red-hat-storage/mcg-osd-deployer/controllers/readyz"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -70,10 +69,8 @@ func init() {
 
 func main() {
 	var metricsAddr string
-	var healthProbeBindAddress string
 	var enableLeaderElection bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&healthProbeBindAddress, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	opts := zap.Options{
@@ -89,13 +86,12 @@ func main() {
 		os.Exit(1)
 	}
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		HealthProbeBindAddress: healthProbeBindAddress,
-		Port:                   9443,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "af4bf43b.openshift.io",
-		Namespace:              envMap[namespaceKey],
+		Scheme:             scheme,
+		MetricsBindAddress: metricsAddr,
+		Port:               9443,
+		LeaderElection:     enableLeaderElection,
+		LeaderElectionID:   "af4bf43b.openshift.io",
+		Namespace:          envMap[namespaceKey],
 	})
 	if err != nil {
 		setupLog.Error(err, "failed to start manager")
@@ -117,14 +113,8 @@ func main() {
 	if err := ensureManagedMCG(mgr.GetClient(), setupLog, envMap); err != nil {
 		os.Exit(1)
 	}
-	if err = mgr.AddReadyzCheck("ping", readyz.ReadinessChecker); err != nil {
-		setupLog.Error(err, "unable to create ready check")
-		os.Exit(1)
-	}
-	readyz.SetReadiness()
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		readyz.UnsetReadiness()
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
