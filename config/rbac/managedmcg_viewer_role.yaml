@@ -7,7 +7,7 @@ rules:
 - apiGroups:
   - mcg.openshift.io
   resources:
-  - managedmcg
+  - managedmcgs
   verbs:
   - get
   - list
@@ -15,6 +15,6 @@ rules:
 - apiGroups:
   - mcg.openshift.io
   resources:
-  - managedmcg/status
+  - managedmcgs/status
   verbs:
   - get

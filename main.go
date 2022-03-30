@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/red-hat-storage/mcg-osd-deployer/controllers"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -36,14 +37,12 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	noobaa "github.com/noobaa/noobaa-operator/v5/pkg/apis"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	mcgv1alpha1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
-	"github.com/red-hat-storage/mcg-osd-deployer/controllers"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -53,71 +52,54 @@ var (
 )
 
 const (
-	namespaceEnvVarName = "NAMESPACE"
-	addonNameEnvVarName = "ADDON_NAME"
+	namespaceKey = "NAMESPACE"
+	addonNameKey = "ADDON_NAME"
 )
 
 func init() {
-	addAllSchemes(scheme)
-	//+kubebuilder:scaffold:scheme
-}
-
-func addAllSchemes(scheme *runtime.Scheme) {
-
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	utilruntime.Must(ocsv1.AddToScheme(scheme))
-
 	utilruntime.Must(odfv1alpha1.AddToScheme(scheme))
-
 	utilruntime.Must(mcgv1alpha1.AddToScheme(scheme))
-
 	utilruntime.Must(noobaa.AddToScheme(scheme))
-
 	utilruntime.Must(opv1a1.AddToScheme(scheme))
-
 	utilruntime.Must(operatorv1.AddToScheme(scheme))
-
-	// +kubebuilder:scaffold:scheme
+	//+kubebuilder:scaffold:scheme
 }
 
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
+		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	opts := zap.Options{
 		Development: true,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
-
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
-	envVars, err := readEnvVars()
+
+	envMap, err := setupEnvMap()
 	if err != nil {
-		setupLog.Error(err, "Failed to get environment variables.")
+		setupLog.Error(err, "failed to get environment variables")
 		os.Exit(1)
 	}
-
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
 		Port:               9443,
 		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "af4bf43b.mcg.openshift.io",
-		Namespace:          envVars[namespaceEnvVarName],
+		LeaderElectionID:   "af4bf43b.openshift.io",
+		Namespace:          envMap[namespaceKey],
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager.")
+		setupLog.Error(err, "failed to start manager")
 		os.Exit(1)
 	}
-	addonName := envVars[addonNameEnvVarName]
+	addonName := envMap[addonNameKey]
 	if err = (&controllers.ManagedMCGReconciler{
 		Client:                       mgr.GetClient(),
-		UnrestrictedClient:           getUnrestrictedClient(),
 		Log:                          ctrl.Log.WithName("controllers").WithName("ManagedMCG"),
 		Scheme:                       mgr.GetScheme(),
 		AddonConfigMapName:           addonName,
@@ -128,10 +110,9 @@ func main() {
 	}
 	//+kubebuilder:scaffold:builder
 
-	if err := ensureManagedMCG(mgr.GetClient(), setupLog, envVars); err != nil {
+	if err := ensureManagedMCG(mgr.GetClient(), setupLog, envMap); err != nil {
 		os.Exit(1)
 	}
-
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
@@ -139,53 +120,40 @@ func main() {
 	}
 }
 
-func getUnrestrictedClient() client.Client {
-	var options client.Options
-
-	options.Scheme = runtime.NewScheme()
-	addAllSchemes(options.Scheme)
-	k8sClient, err := client.New(config.GetConfigOrDie(), options)
-	if err != nil {
-		setupLog.Error(err, "error creating client")
-		os.Exit(1)
+func setupEnvMap() (map[string]string, error) {
+	envMap := map[string]string{
+		namespaceKey: "",
+		addonNameKey: "",
 	}
-	return k8sClient
-}
-
-func readEnvVars() (map[string]string, error) {
-	envVars := map[string]string{
-		namespaceEnvVarName: "",
-		addonNameEnvVarName: "",
-	}
-	for envVarName := range envVars {
-		val, found := os.LookupEnv(envVarName)
+	for key := range envMap {
+		value, found := os.LookupEnv(key)
 		if !found {
-			return nil, fmt.Errorf("%s environment variable must be set", envVarName)
+			return nil, fmt.Errorf("%s environment variable not set", key)
 		}
-		envVars[envVarName] = val
+		envMap[key] = value
 	}
 
-	return envVars, nil
+	return envMap, nil
 }
 
-func ensureManagedMCG(c client.Client, log logr.Logger, envVars map[string]string) error {
+func ensureManagedMCG(c client.Client, log logr.Logger, envMap map[string]string) error {
 	err := c.Create(context.Background(), &mcgv1alpha1.ManagedMCG{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       controllers.ManagedMCGName,
-			Namespace:  envVars[namespaceEnvVarName],
+			Namespace:  envMap[namespaceKey],
 			Finalizers: []string{controllers.ManagedMCGFinalizer},
 		},
 	})
 	if err == nil {
-		log.Info("ManagedMCG resource created.")
+		log.Info("ManagedMCG resource created")
 		return nil
 
 	} else if errors.IsAlreadyExists(err) {
-		log.Info("ManagedMCG resource already exists.")
+		log.Info("ManagedMCG resource exists")
 		return nil
 
 	} else {
-		log.Error(err, "Unable to create ManagedMCG resource")
+		log.Error(err, "failed to create ManagedMCG resource")
 		return err
 	}
 }

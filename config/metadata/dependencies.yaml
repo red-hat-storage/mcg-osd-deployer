@@ -1,9 +1,5 @@
 dependencies:
-- type: olm.package
-  value:
-    packageName: ose-prometheus-operator
-    version: "4.8.0"
-- type: olm.package
-  value:
-    packageName: odf-operator
-    version: "4.9.1"
+  - type: olm.package
+    value:
+      packageName: odf-operator
+      version: "4.9.1"

@@ -8,4 +8,4 @@ webhook:
   port: 9443
 leaderElection:
   leaderElect: true
-  resourceName: af4bf43b.mcg.openshift.io
+  resourceName: af4bf43b.openshift.io

@@ -1,17 +1,6 @@
-// Description: This program creates a web server to verify if the managedmcg
-//              resource is ready. It is used as a readiness probe by the
-//              ocs-osd-deployer operator. For this to be set up, the following
-//              sidecar should be added to the manager CSV:
-//      - name: readinessServer
-//        command:
-//        - /readinessServer
-//        image: ocs-osd-deployer:latest
-//        readinessProbe:
-//          httpGet:
-//            path: /readyz
-//            port: 8081
-//          initialDelaySeconds: 5
-//          periodSeconds: 10
+// This program creates a web server to verify if the managedmcg resource is ready. It is used as a readiness probe by
+// the ocs-osd-deployer operator.
+
 package main
 
 import (
@@ -32,19 +21,13 @@ import (
 )
 
 func main() {
-	// Setup logging
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 	log := ctrl.Log.WithName("readiness")
 
-	// Setup client options
 	var options client.Options
-
-	// The readiness must have these schemes to deserialize the k8s objects
 	options.Scheme = runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(options.Scheme))
-	//utilruntime.Must(ocsv1.AddToScheme(options.Scheme))
 	utilruntime.Must(v1.AddToScheme(options.Scheme))
-
 	k8sClient, err := client.New(config.GetConfigOrDie(), options)
 	if err != nil {
 		log.Error(err, "error creating client")
@@ -62,10 +45,10 @@ func main() {
 		Namespace: namespace,
 	}
 
-	log.Info("starting HTTP server...")
+	log.Info("starting HTTP server", "namespace", namespace)
 	err = readiness.RunServer(k8sClient, managedMCGResource, log)
 	if err != nil {
 		log.Error(err, "server error")
 	}
-	log.Info("HTTP server terminated.")
+	log.Info("HTTP server terminated")
 }

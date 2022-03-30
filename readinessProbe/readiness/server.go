@@ -17,43 +17,29 @@ const (
 )
 
 func isReady(client client.Client, managedMCGResource types.NamespacedName, log logr.Logger) (bool, error) {
-
 	var managedMCG v1.ManagedMCG
-
 	if err := client.Get(context.Background(), managedMCGResource, &managedMCG); err != nil {
-		log.Error(err, "Error while ensuring managedMCG")
+		log.Error(err, "error while ensuring managedMCG")
 		return false, err
 	}
-	ready := managedMCG.Status.Components.Noobaa.State == v1.ComponentReady //&&
-	//managedMCG.Status.Components.Prometheus.State == v1.ComponentReady &&
-	//managedMCG.Status.Components.Alertmanager.State == v1.ComponentReady
-
+	ready := managedMCG.Status.Components.Noobaa.State == v1.ComponentReady
 	return ready, nil
 }
 
 func RunServer(client client.Client, managedMCGResource types.NamespacedName, log logr.Logger) error {
-
-	// Readiness probe is defined here.
-	// From k8s documentation:
-	// "Any code greater than or equal to 200 and less than 400 indicates success."
-	// [indicates that the deployment is ready]
-	// "Any other code indicates failure."
-	// [indicates that the deployment is not ready]
+	// Refer https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes
 	http.HandleFunc(readinessPath, func(httpw http.ResponseWriter, req *http.Request) {
 		ready, err := isReady(client, managedMCGResource, log)
-
 		if err != nil {
-			log.Error(err, "error checking readiness\n")
+			log.Error(err, "error checking readiness")
 			httpw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-
 		if ready {
 			httpw.WriteHeader(http.StatusOK)
 		} else {
 			httpw.WriteHeader(http.StatusServiceUnavailable)
 		}
 	})
-
 	return http.ListenAndServe(listenAddr, nil)
 }
