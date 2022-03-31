@@ -27,6 +27,7 @@ import (
 	noobaav1alpha1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	ofv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	odfv1alpha1 "github.com/red-hat-data-services/odf-operator/api/v1alpha1"
 	mcgv1alpha1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
 	ocsv1 "github.com/red-hat-storage/ocs-operator/api/v1"
@@ -210,6 +211,9 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 		if err := r.reconcileStorageSystem(); err != nil {
 			return ctrl.Result{}, err
 		}
+		if err := r.reconcileOCSCSV(); err != nil {
+			return ctrl.Result{}, err
+		}
 		r.managedMCG.Status.ReconcileStrategy = r.reconcileStrategy
 		isNoobaaReady := r.managedMCG.Status.Components.Noobaa.State == mcgv1alpha1.ComponentReady
 		if foundAddonDeletionKey && isNoobaaReady {
@@ -317,6 +321,38 @@ func (r *ManagedMCGReconciler) reconcileNoobaaComponent() error {
 		return nil
 	})
 	return err
+}
+
+func (r *ManagedMCGReconciler) reconcileOCSCSV() error {
+	var csv *opv1a1.ClusterServiceVersion
+	var err error
+	if csv, err = r.getCSVByPrefix("ocs-operator"); err != nil {
+		return err
+	}
+	var isChanged bool
+	var name string
+	deployments := csv.Spec.InstallStrategy.StrategySpec.DeploymentSpecs
+	zero := int32(0)
+	for i := range deployments {
+		name = deployments[i].Name
+		switch name {
+		case "ocs-operator", "ocs-metrics-exporter", "rook-ceph-operator":
+			replicaCount := &deployments[i].Spec.Replicas
+			if **replicaCount != zero {
+				r.Log.Info("downscaling deployment replicas", "OCS Deployment", name)
+				*replicaCount = &zero
+				isChanged = true
+			}
+		default:
+			r.Log.Info("could not find deployment", "Deployment", name)
+		}
+	}
+	if isChanged {
+		if err := r.update(csv); err != nil {
+			return fmt.Errorf("failed to update OCS CSV: %s", err.Error())
+		}
+	}
+	return nil
 }
 
 func (r *ManagedMCGReconciler) setNoobaaDesiredState(desiredNoobaa *noobaav1alpha1.NooBaa) {
