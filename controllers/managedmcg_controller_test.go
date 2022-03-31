@@ -18,10 +18,11 @@ package controllers
 
 import (
 	"context"
+	"testing"
+
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 
 	noobaa "github.com/noobaa/noobaa-operator/v5/pkg/apis"
 	operatorv1 "github.com/openshift/api/operator/v1"
@@ -92,12 +93,7 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 	r := &ManagedMCGReconciler{}
 	r.Log = ctrl.Log.WithName("controllers").WithName("ManagedMCGFake")
 	r.Scheme = newSchemeFake()
-	r.initializeReconciler(reconcile.Request{
-		NamespacedName: types.NamespacedName{
-			Name:      "managedmcgfake",
-			Namespace: "openshift-storage",
-		},
-	})
+
 	ODFCSVFake := newODFCSVFake()
 	managedMCGFake := newManagedMCGFake()
 	fakeClient := fake.NewClientBuilder().WithScheme(r.Scheme).WithObjects(&ODFCSVFake, &managedMCGFake).Build()
@@ -112,5 +108,44 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 	})
 	if err != nil {
 		t.Errorf("ManagedMCGReconciler.Reconcile() error: %v", err)
+	}
+}
+
+func TestManagedMCGReconcilerReconcilefailure(t *testing.T) {
+	r := &ManagedMCGReconciler{}
+	r.Log = ctrl.Log.WithName("controllers").WithName("ManagedMCGFake")
+	r.Scheme = newSchemeFake()
+
+	ODFCSVFake := newODFCSVFake()
+	managedMCGFake := newManagedMCGFake()
+	fakeClient := fake.NewClientBuilder().WithScheme(r.Scheme).WithObjects(&ODFCSVFake, &managedMCGFake).Build()
+	r.Client = fakeClient
+
+	r.Log.Info("Reconciling ManagedMCG object")
+	_, err := r.Reconcile(context.Background(), reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "managedmcgfake",
+			Namespace: "openshift-storage",
+		},
+	})
+
+	if err != nil {
+		t.Errorf("ManagedMCGReconciler.Reconcile() error: %v", err)
+	}
+
+	r.Log.Info("Reconciling odfOperatorManagerConfigMap after changing name.")
+	r.odfOperatorManagerConfigMap.Name = "fake-odf"
+	if err := r.reconcileODFOperatorManagerConfigMap(); err != nil {
+		r.Log.Info("Could not reconcile odfOperatorManagerConfigMap:", r.odfOperatorManagerConfigMap.Name)
+	}
+	r.Log.Info("Reconciling storageCluster after changing name.")
+	r.storageCluster.Name = "fake-storagecluster"
+	if err := r.reconcileStorageCluster(); err == nil {
+		r.Log.Info("Could not reconcile storageCluster:", r.storageCluster.Name)
+	}
+	r.Log.Info("Reconciling storageSystem after changing name.")
+	r.storageSystem.Name = "fake-storagesystem"
+	if err := r.reconcileStorageSystem(); err == nil {
+		r.Log.Info("Could not reconcile storageSystem:", r.storageSystem.Name)
 	}
 }
