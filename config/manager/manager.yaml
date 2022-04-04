@@ -3,7 +3,7 @@ kind: Namespace
 metadata:
   labels:
     control-plane: controller-manager
-  name: openshift-storage
+  name: openshift-data-federation
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -17,6 +17,8 @@ spec:
     matchLabels:
       control-plane: controller-manager
   replicas: 1
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:
@@ -26,7 +28,7 @@ spec:
         - name: readiness-server
           command:
             - /readinessServer
-          image: quay.io/red-hat-storage/mcg-osd-deployer:latest
+          image: controller:latest
           readinessProbe:
             httpGet:
               path: /readyz
@@ -49,7 +51,7 @@ spec:
             - /manager
           args:
             - --enable-leader-election
-          image: quay.io/red-hat-storage/mcg-osd-deployer:latest
+          image: controller:latest
           name: manager
           resources:
             limits:
@@ -63,6 +65,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name : SOP_ENDPOINT
+              value: test.url
+            - name : ALERT_SMTP_FROM_ADDR
+              value: test@redhat.com
             - name: ADDON_NAME
               value: mcg-osd
             - name: NOOBAA_CORE_IMAGE

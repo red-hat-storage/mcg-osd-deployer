@@ -14,7 +14,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    operators.operatorframework.io/builder: operator-sdk-v1.18.1
+    operators.operatorframework.io/builder: operator-sdk-v1.18.0+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: mcg-osd-deployer.v1.0.0
   namespace: placeholder
@@ -37,6 +37,14 @@ spec:
       clusterPermissions:
       - rules:
         - apiGroups:
+          - ""
+          resources:
+          - secrets
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
           - mcg.openshift.io
           resources:
           - managedmcgs
@@ -57,16 +65,6 @@ spec:
           - get
           - patch
           - update
-        - apiGroups:
-          - operator.openshift.io
-          resources:
-          - consoles
-          verbs:
-          - create
-          - get
-          - list
-          - update
-          - watch
         serviceAccountName: deployer
       deployments:
       - name: mcg-osd-deployer-controller-manager
@@ -75,7 +73,8 @@ spec:
           selector:
             matchLabels:
               control-plane: controller-manager
-          strategy: {}
+          strategy:
+            type: Recreate
           template:
             metadata:
               labels:
@@ -109,13 +108,17 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
+                - name: SOP_ENDPOINT
+                  value: test.url
+                - name: ALERT_SMTP_FROM_ADDR
+                  value: test@redhat.com
                 - name: ADDON_NAME
                   value: mcg-osd
                 - name: NOOBAA_CORE_IMAGE
                   value: quay.io/noobaa/noobaa-core:5.9-20220206
                 - name: NOOBAA_DB_IMAGE
                   value: quay.io/centos7/postgresql-12-centos7:centos7
-                image: quay.io/red-hat-storage/mcg-osd-deployer:latest
+                image: quay.io/napaul/mcg-osd-deployer:v1.9
                 name: manager
                 resources:
                   limits:
@@ -131,7 +134,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
-                image: quay.io/red-hat-storage/mcg-osd-deployer:latest
+                image: quay.io/napaul/mcg-osd-deployer:v1.9
                 name: readiness-server
                 readinessProbe:
                   httpGet:
@@ -161,6 +164,23 @@ spec:
           - update
           - watch
         - apiGroups:
+          - ""
+          resources:
+          - secrets
+          verbs:
+          - create
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - statefulsets
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
           - coordination.k8s.io
           resources:
           - leases
@@ -171,31 +191,55 @@ spec:
           - update
           - watch
         - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - alertmanagerconfigs
+          - alertmanagers
+          - prometheuses
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - podmonitors
+          verbs:
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - prometheusrules
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
           - noobaa.io
           resources:
           - noobaas
           verbs:
           - create
-          - get
-          - list
-          - update
-          - watch
-        - apiGroups:
-          - ocs.openshift.io
-          resources:
-          - storageclusters
-          verbs:
-          - create
-          - get
-          - list
-          - update
-          - watch
-        - apiGroups:
-          - odf.openshift.io
-          resources:
-          - storagesystems
-          verbs:
-          - create
+          - delete
           - get
           - list
           - update
@@ -205,6 +249,17 @@ spec:
           resources:
           - clusterserviceversions
           verbs:
+          - delete
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - route.openshift.io
+          resources:
+          - routes
+          verbs:
+          - create
           - get
           - list
           - update

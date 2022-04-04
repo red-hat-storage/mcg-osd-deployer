@@ -12,5 +12,5 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: controller
-  newName: quay.io/red-hat-storage/mcg-osd-deployer
-  newTag: latest
+  newName: quay.io/napaul/mcg-osd-deployer
+  newTag: v1.9
