@@ -48,7 +48,7 @@ const (
 	RouteName                              = "prometheus-route"
 )
 
-func (r *ManagedMCGReconciler) initPrometheusReconciler(req ctrl.Request) {
+func (r *ManagedMCGReconciler) initializePrometheusReconciler(req ctrl.Request) {
 	r.prometheus = &promv1.Prometheus{}
 	r.prometheus.Name = prometheusName
 	r.prometheus.Namespace = r.namespace

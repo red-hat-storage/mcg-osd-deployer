@@ -68,16 +68,20 @@ type ManagedMCGReconciler struct {
 	Client                       client.Client
 	Log                          logr.Logger
 	Scheme                       *runtime.Scheme
+	AddonParamSecretName         string
+	DeadMansSnitchSecretName     string
+	CustomerNotificationHTMLPath string
+	SMTPSecretName               string
+	SOPEndpoint                  string
+	AlertSMTPFrom                string
+	Route                        *routev1.Route
 
-	ctx               context.Context
-	images            ImageMap
-	managedMCG        *mcgv1alpha1.ManagedMCG
-	namespace         string
-	noobaa            *noobaav1alpha1.NooBaa
-	reconcileStrategy mcgv1alpha1.ReconcileStrategy
-
-	AddonParamSecretName string
-
+	ctx                           context.Context
+	images                        ImageMap
+	managedMCG                    *mcgv1alpha1.ManagedMCG
+	namespace                     string
+	noobaa                        *noobaav1alpha1.NooBaa
+	reconcileStrategy             mcgv1alpha1.ReconcileStrategy
 	prometheus                    *promv1.Prometheus
 	pagerdutySecret               *corev1.Secret
 	deadMansSnitchSecret          *corev1.Secret
@@ -89,12 +93,6 @@ type ManagedMCGReconciler struct {
 	alertmanager                  *promv1.Alertmanager
 	PagerdutySecretName           string
 	dmsRule                       *promv1.PrometheusRule
-	DeadMansSnitchSecretName      string
-	CustomerNotificationHTMLPath  string
-	SMTPSecretName                string
-	SOPEndpoint                   string
-	AlertSMTPFrom                 string
-	Route                         *routev1.Route
 }
 
 func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
@@ -109,7 +107,7 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 	r.noobaa = &noobaav1alpha1.NooBaa{}
 	r.noobaa.Name = noobaaName
 	r.noobaa.Namespace = r.namespace
-	r.initPrometheusReconciler(req)
+	r.initializePrometheusReconciler(req)
 }
 
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources={managedmcgs,managedmcgs/finalizers},verbs=get;list;watch;create;update;patch;delete
@@ -130,7 +128,7 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *ManagedMCGReconciler) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("request_namespace", req.Namespace, "request_name", req.Name)
+	log := r.Log.WithValues("req.Namespace", req.Namespace, "req.Name", req.Name)
 	log.Info("starting reconciliation for ManagedMCG")
 	r.initializeReconciler(req)
 	if err := r.get(r.managedMCG); err != nil {
