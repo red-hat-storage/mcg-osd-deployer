@@ -21,7 +21,6 @@ import (
 	"io/ioutil"
 	"strings"
 
-	routev1 "github.com/openshift/api/route/v1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	promv1a1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/red-hat-storage/mcg-osd-deployer/templates"
@@ -45,7 +44,6 @@ const (
 	dmsRuleName                            = "dms-monitor-rule"
 	alertmanagerConfigName                 = "managed-mcg-alertmanager-config"
 	k8sMetricsServiceMonitorName           = "k8s-metrics-service-monitor"
-	RouteName                              = "prometheus-route"
 )
 
 func (r *ManagedMCGReconciler) initializePrometheusReconciler(req ctrl.Request) {
@@ -77,10 +75,6 @@ func (r *ManagedMCGReconciler) initializePrometheusReconciler(req ctrl.Request) 
 	r.alertRelabelConfigSecret.Name = alertRelabelConfigSecretName
 	r.alertRelabelConfigSecret.Namespace = r.namespace
 
-	r.Route = &routev1.Route{}
-	r.Route.Name = RouteName
-	r.Route.Namespace = r.namespace
-
 	r.smtpSecret = &corev1.Secret{}
 	r.smtpSecret.Name = r.SMTPSecretName
 	r.smtpSecret.Namespace = r.namespace
@@ -103,9 +97,6 @@ func (r *ManagedMCGReconciler) reconcileAlertMonitoring() error {
 		return err
 	}
 	if err := r.reconcileDMSPrometheusRule(); err != nil {
-		return err
-	}
-	if err := r.reconcilePrometheusRoutes(); err != nil {
 		return err
 	}
 	return nil
@@ -132,16 +123,6 @@ func (r *ManagedMCGReconciler) reconcileDMSPrometheusRule() error {
 		return nil
 	})
 
-	return err
-}
-
-func (r *ManagedMCGReconciler) reconcilePrometheusRoutes() error {
-	r.Log.Info("Reconciling Prometheus Routes")
-	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.Route, func() error {
-		desired := templates.RouteTemplate.DeepCopy()
-		r.Route.Spec = desired.Spec
-		return nil
-	})
 	return err
 }
 

@@ -13,4 +13,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/osd-addons/mcg-osd
-  newTag: mcg-osd-deployer
+  newTag: 0.1.0

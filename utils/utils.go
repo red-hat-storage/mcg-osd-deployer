@@ -69,5 +69,3 @@ func AddLabel(obj metav1.Object, key string, value string) {
 func GetRegexMatcher(alerts []string) string {
 	return "^" + strings.Join(alerts, "$|^") + "$"
 }
-
-
