@@ -18,17 +18,16 @@ package controllers
 
 import (
 	"context"
+	"testing"
+
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 
 	noobaa "github.com/noobaa/noobaa-operator/v5/pkg/apis"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
-	odfv1alpha1 "github.com/red-hat-data-services/odf-operator/api/v1alpha1"
 	mcgv1alpha1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
-	ocsv1 "github.com/red-hat-storage/ocs-operator/api/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -40,8 +39,6 @@ import (
 func newSchemeFake() *runtime.Scheme {
 	schemeFake := runtime.NewScheme()
 	clientgoscheme.AddToScheme(schemeFake)
-	ocsv1.AddToScheme(schemeFake)
-	odfv1alpha1.AddToScheme(schemeFake)
 	mcgv1alpha1.AddToScheme(schemeFake)
 	noobaa.AddToScheme(schemeFake)
 	opv1a1.AddToScheme(schemeFake)
