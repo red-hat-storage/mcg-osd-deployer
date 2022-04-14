@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: console
+spec:
+  selector:
+    matchLabels:
+      app: mcg-ms-console
+  template:
+    metadata:
+      labels:
+        app: mcg-ms-console
+    spec:
+      containers:
+        - name: mcg-ms-console
+          image: mcg-ms-console:latest
+          resources:
+            limits:
+              cpu: "100m"
+              memory: "512Mi"
+          ports:
+            - containerPort: 9002
+              protocol: TCP
+          volumeMounts:
+            - name: addon-mcg-osd-parameters
+              mountPath: /var/serving-cert
+              readOnly: true
+      tolerations:
+      - effect: NoSchedule
+        key: node.ocs.openshift.io/storage
+        operator: Equal
+        value: "true"
+      volumes:
+        - name: addon-mcg-osd-parameters
+          secret:
+            secretName: addon-mcg-osd-parameters

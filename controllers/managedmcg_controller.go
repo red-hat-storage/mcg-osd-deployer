@@ -24,10 +24,12 @@ import (
 
 	"github.com/go-logr/logr"
 	noobaav1alpha1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
+	configv1 "github.com/openshift/api/config/v1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	promv1a1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	mcgv1alpha1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
+	"github.com/red-hat-storage/mcg-osd-deployer/console"
 	"github.com/red-hat-storage/mcg-osd-deployer/templates"
 	"github.com/red-hat-storage/mcg-osd-deployer/utils"
 	appsv1 "k8s.io/api/apps/v1"
@@ -39,7 +41,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -71,6 +75,7 @@ type ManagedMCGReconciler struct {
 	SMTPSecretName               string
 	SOPEndpoint                  string
 	AlertSMTPFrom                string
+	ConsolePort                  int
 
 	ctx                      context.Context
 	images                   ImageMap
@@ -130,7 +135,7 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-func (r *ManagedMCGReconciler) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ManagedMCGReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("req.Namespace", req.Namespace, "req.Name", req.Name)
 	log.Info("starting reconciliation for ManagedMCG")
 	r.initializeReconciler(req)
@@ -141,7 +146,7 @@ func (r *ManagedMCGReconciler) Reconcile(_ context.Context, req ctrl.Request) (c
 			return ctrl.Result{}, err
 		}
 	}
-	result, err := r.reconcilePhases()
+	result, err := r.reconcilePhases(ctx, req)
 	if err != nil {
 		r.Log.Error(err, "error reconciling ManagedMCG")
 	}
@@ -161,7 +166,7 @@ func (r *ManagedMCGReconciler) Reconcile(_ context.Context, req ctrl.Request) (c
 	}
 }
 
-func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
+func (r *ManagedMCGReconciler) reconcilePhases(ctx context.Context, req ctrl.Request) (reconcile.Result, error) {
 	r.Log.Info("reconciliation phases initiated")
 	foundAddonDeletionKey := r.verifyAddonDeletionKey()
 	r.updateComponentStatus()
@@ -201,6 +206,17 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 			return ctrl.Result{}, err
 		}
 		if err := r.reconcileOCSCSV(); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		logger := log.FromContext(ctx)
+		instance := configv1.ClusterVersion{}
+		if err := r.Client.Get(context.TODO(), req.NamespacedName, &instance); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		if err := r.ensureConsolePlugin(instance.Status.Desired.Version); err != nil {
+			logger.Error(err, "Could not ensure compatibility for MCG consolePlugin")
 			return ctrl.Result{}, err
 		}
 		r.managedMCG.Status.ReconcileStrategy = r.reconcileStrategy
@@ -632,4 +648,39 @@ func (r *ManagedMCGReconciler) getCSVByPrefix(name string) (*opv1a1.ClusterServi
 	}
 
 	return csv, nil
+}
+
+func (r *ManagedMCGReconciler) ensureConsolePlugin(clusterVersion string) error {
+	// The base path to where the request are sent
+	basePath := console.GetBasePath(clusterVersion)
+
+	// Get mcg console Deployment
+	mcgConsoleDeployment := console.GetDeployment(r.namespace)
+	err := r.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      mcgConsoleDeployment.Name,
+		Namespace: mcgConsoleDeployment.Namespace,
+	}, mcgConsoleDeployment)
+	if err != nil {
+		return err
+	}
+
+	// Create/Update mcg console Service
+	mcgConsoleService := console.GetService(r.ConsolePort, r.namespace)
+	_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, mcgConsoleService, func() error {
+		return controllerutil.SetControllerReference(mcgConsoleDeployment, mcgConsoleService, r.Scheme)
+	})
+	if err != nil && !errors.IsAlreadyExists(err) {
+		return err
+	}
+
+	// Create/Update mcg console ConsolePlugin
+	mcgConsolePlugin := console.GetConsolePluginCR(r.ConsolePort, basePath, r.namespace)
+	_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, mcgConsolePlugin, func() error {
+		return nil
+	})
+	if err != nil && !errors.IsAlreadyExists(err) {
+		return err
+	}
+
+	return nil
 }

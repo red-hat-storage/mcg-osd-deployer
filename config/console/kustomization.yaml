@@ -1,0 +1,15 @@
+namePrefix: mcg-ms-
+
+# Labels to add to all resources and selectors.
+commonLabels:
+  app: mcg-ms-console
+
+resources:
+- console_init.yaml
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+images:
+- name: mcg-ms-console
+  newName: quay.io/skatiyar/mcg-ms-console
+  newTag: latest
