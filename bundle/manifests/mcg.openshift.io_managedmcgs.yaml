@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.4.1
+    controller-gen.kubebuilder.io/version: v0.7.0
   creationTimestamp: null
   name: managedmcgs.mcg.openshift.io
 spec:
@@ -42,6 +42,13 @@ spec:
             properties:
               components:
                 properties:
+                  alertmanager:
+                    properties:
+                      state:
+                        type: string
+                    required:
+                    - state
+                    type: object
                   noobaa:
                     properties:
                       state:
@@ -49,8 +56,17 @@ spec:
                     required:
                     - state
                     type: object
+                  prometheus:
+                    properties:
+                      state:
+                        type: string
+                    required:
+                    - state
+                    type: object
                 required:
+                - alertmanager
                 - noobaa
+                - prometheus
                 type: object
               reconcileStrategy:
                 type: string

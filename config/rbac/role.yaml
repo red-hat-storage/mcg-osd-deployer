@@ -27,16 +27,6 @@ rules:
   - get
   - patch
   - update
-- apiGroups:
-  - operator.openshift.io
-  resources:
-  - consoles
-  verbs:
-  - create
-  - get
-  - list
-  - update
-  - watch
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -57,6 +47,23 @@ rules:
   - update
   - watch
 - apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - coordination.k8s.io
   resources:
   - leases
@@ -67,31 +74,55 @@ rules:
   - update
   - watch
 - apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - alertmanagerconfigs
+  - alertmanagers
+  - prometheuses
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - podmonitors
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - prometheusrules
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - servicemonitors
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - noobaa.io
   resources:
   - noobaas
   verbs:
   - create
-  - get
-  - list
-  - update
-  - watch
-- apiGroups:
-  - ocs.openshift.io
-  resources:
-  - storageclusters
-  verbs:
-  - create
-  - get
-  - list
-  - update
-  - watch
-- apiGroups:
-  - odf.openshift.io
-  resources:
-  - storagesystems
-  verbs:
-  - create
+  - delete
   - get
   - list
   - update
@@ -101,6 +132,7 @@ rules:
   resources:
   - clusterserviceversions
   verbs:
+  - delete
   - get
   - list
   - update

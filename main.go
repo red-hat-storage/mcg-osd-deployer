@@ -20,8 +20,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/red-hat-storage/mcg-osd-deployer/controllers"
 	"os"
+
+	"github.com/red-hat-storage/mcg-osd-deployer/controllers"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -29,8 +30,6 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"github.com/go-logr/logr"
-	odfv1alpha1 "github.com/red-hat-data-services/odf-operator/api/v1alpha1"
-	ocsv1 "github.com/red-hat-storage/ocs-operator/api/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -42,6 +41,8 @@ import (
 	noobaa "github.com/noobaa/noobaa-operator/v5/pkg/apis"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	promv1a1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	mcgv1alpha1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
@@ -52,18 +53,20 @@ var (
 )
 
 const (
-	namespaceKey = "NAMESPACE"
-	addonNameKey = "ADDON_NAME"
+	namespaceKey         = "NAMESPACE"
+	addonNameKey         = "ADDON_NAME"
+	sopEndpointKey       = "SOP_ENDPOINT"
+	alertSMTPFromAddrKey = "ALERT_SMTP_FROM_ADDR"
 )
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(ocsv1.AddToScheme(scheme))
-	utilruntime.Must(odfv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(mcgv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(noobaa.AddToScheme(scheme))
 	utilruntime.Must(opv1a1.AddToScheme(scheme))
 	utilruntime.Must(operatorv1.AddToScheme(scheme))
+	utilruntime.Must(promv1.AddToScheme(scheme))
+	utilruntime.Must(promv1a1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -102,8 +105,15 @@ func main() {
 		Client:                       mgr.GetClient(),
 		Log:                          ctrl.Log.WithName("controllers").WithName("ManagedMCG"),
 		Scheme:                       mgr.GetScheme(),
+		AddonParamSecretName:         fmt.Sprintf("addon-%v-parameters", addonName),
 		AddonConfigMapName:           addonName,
 		AddonConfigMapDeleteLabelKey: fmt.Sprintf("api.openshift.com/addon-%v-delete", addonName),
+		PagerdutySecretName:          fmt.Sprintf("%v-pagerduty", addonName),
+		DeadMansSnitchSecretName:     fmt.Sprintf("%v-deadmanssnitch", addonName),
+		SMTPSecretName:               fmt.Sprintf("%v-smtp", addonName),
+		SOPEndpoint:                  envMap[sopEndpointKey],
+		AlertSMTPFrom:                envMap[alertSMTPFromAddrKey],
+		CustomerNotificationHTMLPath: "templates/customernotification.html",
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ManagedMCG")
 		os.Exit(1)
@@ -122,8 +132,10 @@ func main() {
 
 func setupEnvMap() (map[string]string, error) {
 	envMap := map[string]string{
-		namespaceKey: "",
-		addonNameKey: "",
+		namespaceKey:         "",
+		addonNameKey:         "",
+		sopEndpointKey:       "",
+		alertSMTPFromAddrKey: "",
 	}
 	for key := range envMap {
 		value, found := os.LookupEnv(key)
