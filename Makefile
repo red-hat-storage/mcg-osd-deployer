@@ -1,6 +1,7 @@
 MAKEFILE := $(lastword $(MAKEFILE_LIST))
 
 include shim/.env
+include hack/make-bundle-vars.mk
 
 # Current Operator version
 VERSION ?= 1.0.0
@@ -113,7 +114,7 @@ install: manifests kustomize
 	"\n  icon:" \
 	"\n    base64data: ''" \
 	"\n    mediatype: ''" \
-	"\n  image: ${ODF_IMAGE}" \
+	"\n  image: ${MCG_IMAGE}" \
 	"\n  priority: 100" \
 	"\n  publisher: Red Hat" \
 	"\n  sourceType: grpc" \
@@ -217,6 +218,7 @@ etcd:
 bundle: manifests kustomize
 	operator-sdk generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
+	cd config/console && $(KUSTOMIZE) edit set image mcg-ms-console=$(MCG_CONSOLE_IMG)
 	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS) $(BUNDLE_FLAGS)
 	cp config/metadata/* $(OUTPUT_DIR)/metadata/
 	operator-sdk bundle validate $(OUTPUT_DIR)

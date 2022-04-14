@@ -10,6 +10,7 @@ COPY main.go main.go
 COPY api/ api/
 COPY controllers/ controllers/
 COPY templates/ templates/
+COPY console/ console/
 COPY utils/ utils/
 COPY readinessProbe/ readinessProbe/
 
