@@ -2,6 +2,7 @@ package readiness
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/go-logr/logr"
@@ -20,19 +21,22 @@ func isReady(client client.Client, managedMCGResource types.NamespacedName, log 
 	var managedMCG v1.ManagedMCG
 	if err := client.Get(context.Background(), managedMCGResource, &managedMCG); err != nil {
 		log.Error(err, "error while ensuring managedMCG")
-		return false, err
+
+		return false, fmt.Errorf("error while ensuring managedMCG: %w", err)
 	}
 	ready := managedMCG.Status.Components.Noobaa.State == v1.ComponentReady
+
 	return ready, nil
 }
 
 func RunServer(client client.Client, managedMCGResource types.NamespacedName, log logr.Logger) error {
-	// Refer https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes
+	// Refer https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes
 	http.HandleFunc(readinessPath, func(httpw http.ResponseWriter, req *http.Request) {
 		ready, err := isReady(client, managedMCGResource, log)
 		if err != nil {
 			log.Error(err, "error checking readiness")
 			httpw.WriteHeader(http.StatusInternalServerError)
+
 			return
 		}
 		if ready {
@@ -41,5 +45,8 @@ func RunServer(client client.Client, managedMCGResource types.NamespacedName, lo
 			httpw.WriteHeader(http.StatusServiceUnavailable)
 		}
 	})
-	return http.ListenAndServe(listenAddr, nil)
+
+	err := http.ListenAndServe(listenAddr, nil)
+
+	return fmt.Errorf("error while running readiness server: %w", err)
 }

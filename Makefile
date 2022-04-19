@@ -36,6 +36,10 @@ ARCH = $(shell go env GOARCH)
 
 all: manager
 
+# Run linters
+lint:
+	hack/pre-commit-hooks.sh
+
 # Run tests
 ENVTEST_ASSETS_DIR = $(shell pwd)/testbin
 test: generate fmt vet manifests

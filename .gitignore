@@ -19,6 +19,8 @@ testbin/*
 !vendor/**/zz_generated.*
 
 # editor and IDE paraphernalia
+.run
+.vscode
 .idea
 *.swp
 *.swo

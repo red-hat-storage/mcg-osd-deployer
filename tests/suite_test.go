@@ -17,11 +17,13 @@ limitations under the License.
 package tests
 
 import (
+	"path/filepath"
+	"testing"
+
 	"github.com/red-hat-storage/mcg-osd-deployer/controllers"
 	"k8s.io/client-go/kubernetes/scheme"
-	"path/filepath"
+
 	ctrl "sigs.k8s.io/controller-runtime"
-	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -38,8 +40,10 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-var k8sClient client.Client
-var testEnv *envtest.Environment
+var (
+	k8sClient client.Client
+	testEnv   *envtest.Environment
+)
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)

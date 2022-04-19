@@ -17,6 +17,7 @@ limitations under the License.
 package templates
 
 import (
+	//
 	_ "github.com/go-openapi/spec"
 	noobaa "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	v1 "k8s.io/api/core/v1"

@@ -32,21 +32,18 @@ import (
 )
 
 const (
-	alertRelabelConfigSecretKey            = "alertrelabelconfig.yaml"
-	prometheusName                         = "managed-mcg-prometheus"
-	monLabelKey                            = "app"
-	monLabelValue                          = "managed-mcg"
-	alertRelabelConfigSecretName           = "managed-mcg-alert-relabel-config-secret"
-	alertmanagerName                       = "managed-mcg-alertmanager"
-	notificationEmailKeyPrefix             = "notification-email"
-	k8sMetricsServiceMonitorAuthSecretName = "k8s-metrics-service-monitor-auth"
-	openshiftMonitoringNamespace           = "openshift-monitoring"
-	dmsRuleName                            = "dms-monitor-rule"
-	alertmanagerConfigName                 = "managed-mcg-alertmanager-config"
-	k8sMetricsServiceMonitorName           = "k8s-metrics-service-monitor"
+	alertRelabelConfigSecretKey  = "alertrelabelconfig.yaml"
+	prometheusName               = "managed-mcg-prometheus"
+	monLabelKey                  = "app"
+	monLabelValue                = "managed-mcg"
+	alertRelabelConfigSecretName = "managed-mcg-alert-relabel-config-secret"
+	alertmanagerName             = "managed-mcg-alertmanager"
+	notificationEmailKeyPrefix   = "notification-email"
+	dmsRuleName                  = "dms-monitor-rule"
+	alertmanagerConfigName       = "managed-mcg-alertmanager-config"
 )
 
-func (r *ManagedMCGReconciler) initializePrometheusReconciler(req ctrl.Request) {
+func (r *ManagedMCGReconciler) initializePrometheusReconciler() {
 	r.prometheus = &promv1.Prometheus{}
 	r.prometheus.Name = prometheusName
 	r.prometheus.Namespace = r.namespace
@@ -99,6 +96,7 @@ func (r *ManagedMCGReconciler) reconcileAlertMonitoring() error {
 	if err := r.reconcileDMSPrometheusRule(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -123,19 +121,19 @@ func (r *ManagedMCGReconciler) reconcileDMSPrometheusRule() error {
 		return nil
 	})
 
-	return err
+	return fmt.Errorf("failed to reconcile DMS Prometheus Rule: %w", err)
 }
 
 // reconcileMonitoringResources labels all monitoring resources (ServiceMonitors, PodMonitors, and PrometheusRules)
 // found in the target namespace with a label that matches the label selector the defined on the Prometheus resource
-// we are reconciling in reconcilePrometheus. Doing so instructs the Prometheus instance to notice and react to these labeled
-// monitoring resources
+// we are reconciling in reconcilePrometheus. Doing so instructs the Prometheus instance to notice and react to these
+// labeled monitoring resources.
 func (r *ManagedMCGReconciler) reconcileMonitoringResources() error {
 	r.Log.Info("reconciling monitoring resources")
 
 	podMonitorList := promv1.PodMonitorList{}
 	if err := r.list(&podMonitorList); err != nil {
-		return fmt.Errorf("Could not list pod monitors: %v", err)
+		return fmt.Errorf("could not list pod monitors: %w", err)
 	}
 	for i := range podMonitorList.Items {
 		obj := podMonitorList.Items[i]
@@ -147,7 +145,7 @@ func (r *ManagedMCGReconciler) reconcileMonitoringResources() error {
 
 	serviceMonitorList := promv1.ServiceMonitorList{}
 	if err := r.list(&serviceMonitorList); err != nil {
-		return fmt.Errorf("Could not list service monitors: %v", err)
+		return fmt.Errorf("could not list service monitors: %w", err)
 	}
 	for i := range serviceMonitorList.Items {
 		obj := serviceMonitorList.Items[i]
@@ -159,7 +157,7 @@ func (r *ManagedMCGReconciler) reconcileMonitoringResources() error {
 
 	promRuleList := promv1.PrometheusRuleList{}
 	if err := r.list(&promRuleList); err != nil {
-		return fmt.Errorf("Could not list prometheus rules: %v", err)
+		return fmt.Errorf("could not list prometheus rules: %w", err)
 	}
 	for i := range promRuleList.Items {
 		obj := promRuleList.Items[i]
@@ -177,106 +175,93 @@ func (r *ManagedMCGReconciler) reconcileAlertmanagerConfig() error {
 
 	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.alertmanagerConfig, func() error {
 		if err := r.own(r.alertmanagerConfig); err != nil {
-			return err
+			return fmt.Errorf("failed to own AlertmanagerConfig secret: %w", err)
 		}
 
 		if err := r.get(r.pagerdutySecret); err != nil {
-			return fmt.Errorf("Unable to get pagerduty secret: %v", err)
-		}
-		pagerdutySecretData := r.pagerdutySecret.Data
-		pagerdutyServiceKey := string(pagerdutySecretData["PAGERDUTY_KEY"])
-		if pagerdutyServiceKey == "" {
-			return fmt.Errorf("Pagerduty secret does not contain a PAGERDUTY_KEY entry")
+			return fmt.Errorf("unable to get pagerduty secret: %w", err)
 		}
 
-		if r.deadMansSnitchSecret.UID == "" {
-			if err := r.get(r.deadMansSnitchSecret); err != nil {
-				return fmt.Errorf("Unable to get DeadMan's Snitch secret: %v", err)
-			}
+		if string(r.pagerdutySecret.Data["PAGERDUTY_KEY"]) == "" {
+			return fmt.Errorf("pagerduty secret does not contain a PAGERDUTY_KEY entry")
 		}
+
+		err := r.get(r.deadMansSnitchSecret)
+		if r.deadMansSnitchSecret.UID == "" && err != nil {
+			return fmt.Errorf("unable to get DeadMansSnitch secret: %w", err)
+		}
+
 		dmsURL := string(r.deadMansSnitchSecret.Data["SNITCH_URL"])
 		if dmsURL == "" {
-			return fmt.Errorf("DeadMan's Snitch secret does not contain a SNITCH_URL entry")
+			return fmt.Errorf("DeadMansSnitch secret does not contain a SNITCH_URL entry")
 		}
 
-		alertingAddressList := []string{}
-		i := 0
-		for {
+		var alertingAddressList []string
+		for i := 0; ; i++ {
 			alertingAddressKey := fmt.Sprintf("%s-%v", notificationEmailKeyPrefix, i)
 			alertingAddress, found := r.addonParams[alertingAddressKey]
-			i++
-			if found {
-				alertingAddressAsString := alertingAddress
-				if alertingAddressAsString != "" {
-					alertingAddressList = append(alertingAddressList, alertingAddressAsString)
-				}
-			} else {
+			if !found {
 				break
 			}
+			alertingAddressList = append(alertingAddressList, alertingAddress)
 		}
 
-		smtpSecretData := map[string][]byte{}
-		if r.smtpSecret.UID == "" {
-			if err := r.get(r.smtpSecret); err != nil {
-				return fmt.Errorf("Unable to get SMTP secret : %v", err)
+		err = r.get(r.smtpSecret)
+		if r.smtpSecret.UID == "" && err != nil {
+			return fmt.Errorf("unable to get SMTP secret : %w", err)
+		}
+		params := []string{
+			"host",
+			"port",
+			"username",
+			"password",
+		}
+		for _, param := range params {
+			if string(r.smtpSecret.Data[param]) == "" {
+				return fmt.Errorf("SMTP secret does not contain a %s entry", param)
 			}
-		}
-		smtpSecretData = r.smtpSecret.Data
-		smtpHost := string(smtpSecretData["host"])
-		if smtpHost == "" {
-			return fmt.Errorf("smtp secret does not contain a host entry")
-		}
-		smtpPort := string(smtpSecretData["port"])
-		if smtpPort == "" {
-			return fmt.Errorf("smtp secret does not contain a port entry")
-		}
-		smtpUsername := string(smtpSecretData["username"])
-		if smtpUsername == "" {
-			return fmt.Errorf("smtp secret does not contain a username entry")
-		}
-		smtpPassword := string(smtpSecretData["password"])
-		if smtpPassword == "" {
-			return fmt.Errorf("smtp secret does not contain a password entry.")
 		}
 		smtpHTML, err := ioutil.ReadFile(r.CustomerNotificationHTMLPath)
 		if err != nil {
-			return fmt.Errorf("unable to read customernotification.html file: %v", err)
+			return fmt.Errorf("unable to read customernotification.html file: %w", err)
 		}
-
-		desired := templates.AlertmanagerConfigTemplate.DeepCopy()
-		for i := range desired.Spec.Receivers {
-			receiver := &desired.Spec.Receivers[i]
-			switch receiver.Name {
-			case "pagerduty":
-				receiver.PagerDutyConfigs[0].ServiceKey.Key = "PAGERDUTY_KEY"
-				receiver.PagerDutyConfigs[0].ServiceKey.LocalObjectReference.Name = r.PagerdutySecretName
-				receiver.PagerDutyConfigs[0].Details[0].Key = "SOP"
-				receiver.PagerDutyConfigs[0].Details[0].Value = r.SOPEndpoint
-			case "DeadMansSnitch":
-				receiver.WebhookConfigs[0].URL = &dmsURL
-			case "SendGrid":
-				if len(alertingAddressList) > 0 {
-					receiver.EmailConfigs[0].Smarthost = fmt.Sprintf("%s:%s", smtpHost, smtpPort)
-					receiver.EmailConfigs[0].AuthUsername = smtpUsername
-					receiver.EmailConfigs[0].AuthPassword.LocalObjectReference.Name = r.SMTPSecretName
-					receiver.EmailConfigs[0].AuthPassword.Key = "password"
-					receiver.EmailConfigs[0].From = r.AlertSMTPFrom
-					receiver.EmailConfigs[0].To = strings.Join(alertingAddressList, ", ")
-					receiver.EmailConfigs[0].HTML = string(smtpHTML)
-				} else {
-					r.Log.V(-1).Info("Customer Email for alert notification is not provided")
-					receiver.EmailConfigs = []promv1a1.EmailConfig{}
-				}
-			}
-
-		}
-		r.alertmanagerConfig.Spec = desired.Spec
-		utils.AddLabel(r.alertmanagerConfig, monLabelKey, monLabelValue)
+		r.configReceiver(dmsURL, alertingAddressList, smtpHTML)
 
 		return nil
 	})
 
-	return err
+	return fmt.Errorf("unable to update alertmanager config: %w", err)
+}
+
+func (r *ManagedMCGReconciler) configReceiver(dmsURL string, alertingAddressList []string, smtpHTML []byte) {
+	desired := templates.AlertmanagerConfigTemplate.DeepCopy()
+	for i := range desired.Spec.Receivers {
+		receiver := &desired.Spec.Receivers[i]
+		switch receiver.Name {
+		case "pagerduty":
+			receiver.PagerDutyConfigs[0].ServiceKey.Key = "PAGERDUTY_KEY"
+			receiver.PagerDutyConfigs[0].ServiceKey.LocalObjectReference.Name = r.PagerdutySecretName
+			receiver.PagerDutyConfigs[0].Details[0].Key = "SOP"
+			receiver.PagerDutyConfigs[0].Details[0].Value = r.SOPEndpoint
+		case "DeadMansSnitch":
+			receiver.WebhookConfigs[0].URL = &dmsURL
+		case "SendGrid":
+			receiver.EmailConfigs = []promv1a1.EmailConfig{}
+			if len(alertingAddressList) > 0 {
+				receiver.EmailConfigs[0].Smarthost = fmt.Sprintf("%s:%s", r.smtpSecret.Data["host"], r.smtpSecret.Data["port"])
+				receiver.EmailConfigs[0].AuthUsername = string(r.smtpSecret.Data["username"])
+				receiver.EmailConfigs[0].AuthPassword.LocalObjectReference.Name = r.SMTPSecretName
+				receiver.EmailConfigs[0].AuthPassword.Key = "password"
+				receiver.EmailConfigs[0].From = r.AlertSMTPFrom
+				receiver.EmailConfigs[0].To = strings.Join(alertingAddressList, ", ")
+				receiver.EmailConfigs[0].HTML = string(smtpHTML)
+			} else {
+				r.Log.Info("customer email for alert notification is not provided")
+			}
+		}
+	}
+	r.alertmanagerConfig.Spec = desired.Spec
+	utils.AddLabel(r.alertmanagerConfig, monLabelKey, monLabelValue)
 }
 
 func (r *ManagedMCGReconciler) reconcileAlertmanager() error {
@@ -298,8 +283,9 @@ func (r *ManagedMCGReconciler) reconcileAlertmanager() error {
 		return nil
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to update alertmanager: %w", err)
 	}
+
 	return nil
 }
 
@@ -319,17 +305,18 @@ func (r *ManagedMCGReconciler) reconcilePrometheus() error {
 			},
 			Key: alertRelabelConfigSecretKey,
 		}
+
 		return nil
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to update prometheus: %w", err)
 	}
 
 	return nil
 }
 
 // AlertRelabelConfigSecret will have configuration for relabeling the alerts that are firing.
-// It will add namespace label to firing alerts before they are sent to the alertmanager
+// It will add namespace label to firing alerts before they are sent to the alertmanager.
 func (r *ManagedMCGReconciler) reconcileAlertRelabelConfigSecret() error {
 	r.Log.Info("Reconciling alertRelabelConfigSecret")
 	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.alertRelabelConfigSecret, func() error {
@@ -337,7 +324,7 @@ func (r *ManagedMCGReconciler) reconcileAlertRelabelConfigSecret() error {
 			return err
 		}
 		alertRelabelConfig := []struct {
-			TargetLabel string `yaml:"target_label,omitempty"`
+			TargetLabel string `yaml:"targetLabel,omitempty"`
 			Replacement string `yaml:"replacement,omitempty"`
 		}{{
 			TargetLabel: "namespace",
@@ -345,15 +332,17 @@ func (r *ManagedMCGReconciler) reconcileAlertRelabelConfigSecret() error {
 		}}
 		config, err := yaml.Marshal(alertRelabelConfig)
 		if err != nil {
-			return fmt.Errorf("Unable to encode alert relabel conifg: %v", err)
+			return fmt.Errorf("unable to encode alert relabel conifg: %w", err)
 		}
 		r.alertRelabelConfigSecret.Data = map[string][]byte{
 			alertRelabelConfigSecretKey: config,
 		}
+
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("Unable to create/update AlertRelabelConfigSecret: %v", err)
+		return fmt.Errorf("unable to create/update AlertRelabelConfigSecret: %w", err)
 	}
+
 	return nil
 }

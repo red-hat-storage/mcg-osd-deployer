@@ -34,17 +34,18 @@ func GetResourceRequirements(name string) corev1.ResourceRequirements {
 	panic(fmt.Sprintf("Resource requirement not found: %v", name))
 }
 
-// Contains checks whether a string is contained within a slice
+// Contains checks whether a string is contained within a slice.
 func Contains(slice []string, s string) bool {
 	for _, item := range slice {
 		if item == s {
 			return true
 		}
 	}
+
 	return false
 }
 
-// Remove eliminates a given string from a slice and returns the new slice
+// Remove eliminates a given string from a slice and returns the new slice.
 func Remove(slice []string, s string) (result []string) {
 	for _, item := range slice {
 		if item == s {
@@ -52,10 +53,11 @@ func Remove(slice []string, s string) (result []string) {
 		}
 		result = append(result, item)
 	}
+
 	return
 }
 
-// AddLabel add a label to a resource metadata
+// AddLabel add a label to a resource metadata.
 func AddLabel(obj metav1.Object, key string, value string) {
 	labels := obj.GetLabels()
 	if labels == nil {
@@ -65,7 +67,7 @@ func AddLabel(obj metav1.Object, key string, value string) {
 	labels[key] = value
 }
 
-// GetRegexMatcher converts list of alerts to regex matcher
+// GetRegexMatcher converts list of alerts to regex matcher.
 func GetRegexMatcher(alerts []string) string {
 	return "^" + strings.Join(alerts, "$|^") + "$"
 }

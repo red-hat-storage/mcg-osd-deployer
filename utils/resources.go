@@ -5,64 +5,61 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-var (
-	// DaemonResources map contains the default resource requirements for the
-	// various MCG daemons
-	ResourceRequirements = map[string]corev1.ResourceRequirements{
-		"noobaa-core": {
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3"),
-				corev1.ResourceMemory: resource.MustParse("4Gi"),
-			},
-			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3"),
-				corev1.ResourceMemory: resource.MustParse("4Gi"),
-			},
+// ResourceRequirements DaemonResources map contains the default resource requirements for the various MCG daemons.
+var ResourceRequirements = map[string]corev1.ResourceRequirements{
+	"noobaa-core": {
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("3"),
+			corev1.ResourceMemory: resource.MustParse("4Gi"),
 		},
-		"noobaa-db": {
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3"),
-				corev1.ResourceMemory: resource.MustParse("4Gi"),
-			},
-			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3"),
-				corev1.ResourceMemory: resource.MustParse("4Gi"),
-			},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("3"),
+			corev1.ResourceMemory: resource.MustParse("4Gi"),
 		},
-		"noobaa-db-vol": {
-			Requests: corev1.ResourceList{
-				corev1.ResourceStorage: resource.MustParse("50Gi"),
-			},
+	},
+	"noobaa-db": {
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("3"),
+			corev1.ResourceMemory: resource.MustParse("4Gi"),
 		},
-		"noobaa-endpoint": {
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3"),
-				corev1.ResourceMemory: resource.MustParse("4Gi"),
-			},
-			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3"),
-				corev1.ResourceMemory: resource.MustParse("4Gi"),
-			},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("3"),
+			corev1.ResourceMemory: resource.MustParse("4Gi"),
 		},
-		"prometheus": {
-			Requests: corev1.ResourceList{
-				"cpu":    resource.MustParse("500m"),
-				"memory": resource.MustParse("250Mi"),
-			},
-			Limits: corev1.ResourceList{
-				"cpu":    resource.MustParse("500m"),
-				"memory": resource.MustParse("250Mi"),
-			},
+	},
+	"noobaa-db-vol": {
+		Requests: corev1.ResourceList{
+			corev1.ResourceStorage: resource.MustParse("50Gi"),
 		},
-		"alertmanager": {
-			Requests: corev1.ResourceList{
-				"cpu":    resource.MustParse("200m"),
-				"memory": resource.MustParse("200Mi"),
-			},
-			Limits: corev1.ResourceList{
-				"cpu":    resource.MustParse("200m"),
-				"memory": resource.MustParse("200Mi"),
-			},
+	},
+	"noobaa-endpoint": {
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("3"),
+			corev1.ResourceMemory: resource.MustParse("4Gi"),
 		},
-	}
-)
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("3"),
+			corev1.ResourceMemory: resource.MustParse("4Gi"),
+		},
+	},
+	"prometheus": {
+		Requests: corev1.ResourceList{
+			"cpu":    resource.MustParse("500m"),
+			"memory": resource.MustParse("250Mi"),
+		},
+		Limits: corev1.ResourceList{
+			"cpu":    resource.MustParse("500m"),
+			"memory": resource.MustParse("250Mi"),
+		},
+	},
+	"alertmanager": {
+		Requests: corev1.ResourceList{
+			"cpu":    resource.MustParse("200m"),
+			"memory": resource.MustParse("200Mi"),
+		},
+		Limits: corev1.ResourceList{
+			"cpu":    resource.MustParse("200m"),
+			"memory": resource.MustParse("200Mi"),
+		},
+	},
+}
