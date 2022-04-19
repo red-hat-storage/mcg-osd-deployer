@@ -22,17 +22,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/red-hat-storage/mcg-osd-deployer/templates"
-
 	"github.com/go-logr/logr"
 	noobaav1alpha1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	promv1a1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	mcgv1alpha1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
+	"github.com/red-hat-storage/mcg-osd-deployer/templates"
 	"github.com/red-hat-storage/mcg-osd-deployer/utils"
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,23 +72,22 @@ type ManagedMCGReconciler struct {
 	SOPEndpoint                  string
 	AlertSMTPFrom                string
 
-	ctx                           context.Context
-	images                        ImageMap
-	managedMCG                    *mcgv1alpha1.ManagedMCG
-	namespace                     string
-	noobaa                        *noobaav1alpha1.NooBaa
-	reconcileStrategy             mcgv1alpha1.ReconcileStrategy
-	prometheus                    *promv1.Prometheus
-	pagerdutySecret               *corev1.Secret
-	deadMansSnitchSecret          *corev1.Secret
-	smtpSecret                    *corev1.Secret
-	alertmanagerConfig            *promv1a1.AlertmanagerConfig
-	alertRelabelConfigSecret      *corev1.Secret
-	addonParams                   map[string]string
-	onboardingValidationKeySecret *corev1.Secret
-	alertmanager                  *promv1.Alertmanager
-	PagerdutySecretName           string
-	dmsRule                       *promv1.PrometheusRule
+	ctx                      context.Context
+	images                   ImageMap
+	managedMCG               *mcgv1alpha1.ManagedMCG
+	namespace                string
+	noobaa                   *noobaav1alpha1.NooBaa
+	reconcileStrategy        mcgv1alpha1.ReconcileStrategy
+	prometheus               *promv1.Prometheus
+	pagerdutySecret          *v1.Secret
+	deadMansSnitchSecret     *v1.Secret
+	smtpSecret               *v1.Secret
+	alertmanagerConfig       *promv1a1.AlertmanagerConfig
+	alertRelabelConfigSecret *v1.Secret
+	addonParams              map[string]string
+	alertmanager             *promv1.Alertmanager
+	PagerdutySecretName      string
+	dmsRule                  *promv1.PrometheusRule
 }
 
 func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
@@ -105,7 +102,7 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 	r.noobaa = &noobaav1alpha1.NooBaa{}
 	r.noobaa.Name = noobaaName
 	r.noobaa.Namespace = r.namespace
-	r.initializePrometheusReconciler(req)
+	r.initializePrometheusReconciler()
 }
 
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources={managedmcgs,managedmcgs/finalizers},verbs=get;list;watch;create;update;patch;delete
@@ -116,11 +113,11 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 //+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=noobaas,verbs=get;list;watch;create;update;delete
 //+kubebuilder:rbac:groups=operators.coreos.com,namespace=system,resources=clusterserviceversions,verbs=get;list;watch;update;delete
 
-// +kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources={alertmanagers,prometheuses,alertmanagerconfigs},verbs=get;list;watch;create;update
-// +kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources=prometheusrules,verbs=get;list;watch;create;update
-// +kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources=podmonitors,verbs=get;list;watch;update;patch
-// +kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources=servicemonitors,verbs=get;list;watch;update;patch;create
-// +kubebuilder:rbac:groups="apps",namespace=system,resources=statefulsets,verbs=get;list;watch
+//+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources={alertmanagers,prometheuses,alertmanagerconfigs},verbs=get;list;watch;create;update
+//+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources=prometheusrules,verbs=get;list;watch;create;update
+//+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources=podmonitors,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources=servicemonitors,verbs=get;list;watch;update;patch;create
+//+kubebuilder:rbac:groups="apps",namespace=system,resources=statefulsets,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -143,12 +140,14 @@ func (r *ManagedMCGReconciler) Reconcile(_ context.Context, req ctrl.Request) (c
 	if r.managedMCG.UID != "" {
 		statusErr = r.Client.Status().Update(r.ctx, r.managedMCG)
 	}
+
 	// Reconcile errors have priority to status update errors
-	if err != nil {
-		return ctrl.Result{}, err
-	} else if statusErr != nil {
-		return ctrl.Result{}, statusErr
-	} else {
+	switch {
+	case err != nil:
+		return ctrl.Result{}, fmt.Errorf("error reconciling ManagedMCG: %w", err)
+	case statusErr != nil:
+		return ctrl.Result{}, fmt.Errorf("error updating ManagedMCG status: %w", statusErr)
+	default:
 		return result, nil
 	}
 }
@@ -157,12 +156,13 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 	r.Log.Info("reconciliation phases initiated")
 	foundAddonDeletionKey := r.verifyAddonDeletionKey()
 	r.updateComponentStatus()
-	if !r.managedMCG.DeletionTimestamp.IsZero() {
+	switch {
+	case !r.managedMCG.DeletionTimestamp.IsZero():
 		if r.managedMCG.Status.Components.Noobaa.State == mcgv1alpha1.ComponentNotFound {
 			r.Log.Info("removing ManagedMCG finalizer")
 			r.managedMCG.SetFinalizers(utils.Remove(r.managedMCG.Finalizers, ManagedMCGFinalizer))
 			if err := r.update(r.managedMCG); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to remove ManagedMCG finalizer: %v", err)
+				return ctrl.Result{}, fmt.Errorf("failed to remove ManagedMCG finalizer: %w", err)
 			}
 			r.Log.Info("ManagedMCG finalizer removed successfully")
 		} else {
@@ -170,12 +170,12 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 				return ctrl.Result{}, err
 			}
 		}
-	} else if r.managedMCG.UID != "" {
+	case r.managedMCG.UID != "":
 		if !utils.Contains(r.managedMCG.GetFinalizers(), ManagedMCGFinalizer) {
 			r.Log.Info("adding ManagedMCG finalizer")
 			r.managedMCG.SetFinalizers(append(r.managedMCG.GetFinalizers(), ManagedMCGFinalizer))
 			if err := r.update(r.managedMCG); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to add ManagedMCG finalizer: %v", err)
+				return ctrl.Result{}, fmt.Errorf("failed to add ManagedMCG finalizer: %w", err)
 			}
 		}
 		r.reconcileStrategy = mcgv1alpha1.ReconcileStrategyStrict
@@ -198,12 +198,13 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 		if foundAddonDeletionKey && r.areComponentsReadyForUninstall() {
 			r.Log.Info("commencing addon deletion Components in ready state", "addon deletion key", foundAddonDeletionKey)
 			if err := r.delete(r.managedMCG); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to delete ManagedMCG: %v", err)
+				return ctrl.Result{}, fmt.Errorf("failed to delete ManagedMCG: %w", err)
 			}
 		}
-	} else if foundAddonDeletionKey {
+	case foundAddonDeletionKey:
 		return ctrl.Result{}, r.removeOLMComponents()
 	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -211,24 +212,26 @@ func (r *ManagedMCGReconciler) removeNoobaa() error {
 	r.Log.Info("removing Noobaa")
 	r.noobaa.SetFinalizers(utils.Remove(r.noobaa.GetFinalizers(), noobaaFinalizer))
 	if err := r.Client.Update(r.ctx, r.noobaa); err != nil {
-		return fmt.Errorf("failed to remove Noobaa finalizer: %v", err)
+		return fmt.Errorf("failed to remove Noobaa finalizer: %w", err)
 	}
 	if err := r.delete(r.noobaa); err != nil {
-		return fmt.Errorf("failed to delete Noobaa CR: %v", err)
+		return fmt.Errorf("failed to delete Noobaa CR: %w", err)
 	}
+
 	return nil
 }
 
 func (r *ManagedMCGReconciler) updateAddonParams() error {
-	addonParamSecret := &corev1.Secret{}
+	addonParamSecret := &v1.Secret{}
 	addonParamSecret.Name = r.AddonParamSecretName
 	addonParamSecret.Namespace = r.namespace
 	if err := r.get(addonParamSecret); err != nil {
-		return fmt.Errorf("Failed to get the addon parameters secret %v", r.AddonParamSecretName)
+		return fmt.Errorf("failed to get the addon parameters secret %v", r.AddonParamSecretName)
 	}
 	for key, value := range addonParamSecret.Data {
 		r.addonParams[key] = string(value)
 	}
+
 	return nil
 }
 
@@ -237,21 +240,23 @@ func (r *ManagedMCGReconciler) removeOLMComponents() error {
 	var err error
 	if csv, err := r.getCSVByPrefix(deployerCSVPrefix); err == nil {
 		if err := r.delete(csv); err != nil {
-			return fmt.Errorf("failed to delete CSV: %v", err)
+			return fmt.Errorf("failed to delete CSV: %w", err)
 		}
 	}
+
 	return err
 }
 
 func (r *ManagedMCGReconciler) areComponentsReadyForUninstall() bool {
 	subComponents := r.managedMCG.Status.Components
+
 	return subComponents.Noobaa.State == mcgv1alpha1.ComponentReady &&
 		subComponents.Prometheus.State == mcgv1alpha1.ComponentReady &&
 		subComponents.Alertmanager.State == mcgv1alpha1.ComponentReady
 }
 
 // verifyAddonDeletionKey checks if the uninstallation condition is met
-// by fetching the configmap and checking if the uninstallation key is set
+// by fetching the configmap and checking if the uninstallation key is set.
 func (r *ManagedMCGReconciler) verifyAddonDeletionKey() bool {
 	configmap := &v1.ConfigMap{}
 	configmap.Name = r.AddonConfigMapName
@@ -261,9 +266,11 @@ func (r *ManagedMCGReconciler) verifyAddonDeletionKey() bool {
 		if !errors.IsNotFound(err) {
 			r.Log.Error(err, "Unable to get addon delete configmap")
 		}
+
 		return false
 	}
 	_, ok := configmap.Labels[r.AddonConfigMapDeleteLabelKey]
+
 	return ok
 }
 
@@ -274,9 +281,11 @@ func (r *ManagedMCGReconciler) reconcileNoobaaComponent() error {
 	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.noobaa, func() error {
 		r.Log.Info("creating/updating Noobaa CR", "name", noobaaName)
 		r.noobaa.Spec = desiredNoobaa.Spec
+
 		return nil
 	})
-	return err
+
+	return fmt.Errorf("failed to reconcile Noobaa: %w", err)
 }
 
 func (r *ManagedMCGReconciler) reconcileOCSCSV() error {
@@ -305,9 +314,10 @@ func (r *ManagedMCGReconciler) reconcileOCSCSV() error {
 	}
 	if isChanged {
 		if err := r.update(csv); err != nil {
-			return fmt.Errorf("failed to update OCS CSV: %s", err.Error())
+			return fmt.Errorf("failed to update OCS CSV: %w", err)
 		}
 	}
+
 	return nil
 }
 
@@ -336,22 +346,24 @@ func (r *ManagedMCGReconciler) setNoobaaDesiredState(desiredNoobaa *noobaav1alph
 func (r *ManagedMCGReconciler) updateComponentStatus() {
 	r.Log.Info("updating Noobaa component status")
 	noobaaComponent := &r.managedMCG.Status.Components.Noobaa
-	if err := r.get(r.noobaa); err == nil {
+	switch err := r.get(r.noobaa); {
+	case err == nil:
 		if r.noobaa.Status.Phase == "Ready" {
 			noobaaComponent.State = mcgv1alpha1.ComponentReady
 		} else {
 			noobaaComponent.State = mcgv1alpha1.ComponentPending
 		}
-	} else if errors.IsNotFound(err) {
+	case errors.IsNotFound(err):
 		noobaaComponent.State = mcgv1alpha1.ComponentNotFound
-	} else {
+	default:
 		r.Log.Info("Could not fetch Noobaa CR")
 		noobaaComponent.State = mcgv1alpha1.ComponentUnknown
 	}
 
 	// Getting the status of the Prometheus component.
 	promStatus := &r.managedMCG.Status.Components.Prometheus
-	if err := r.get(r.prometheus); err == nil {
+	switch err := r.get(r.prometheus); {
+	case err == nil:
 		promStatefulSet := &appsv1.StatefulSet{}
 		promStatefulSet.Namespace = r.namespace
 		promStatefulSet.Name = fmt.Sprintf("prometheus-%s", prometheusName)
@@ -368,16 +380,17 @@ func (r *ManagedMCGReconciler) updateComponentStatus() {
 		} else {
 			promStatus.State = mcgv1alpha1.ComponentPending
 		}
-	} else if errors.IsNotFound(err) {
+	case errors.IsNotFound(err):
 		promStatus.State = mcgv1alpha1.ComponentNotFound
-	} else {
-		r.Log.V(-1).Info("error getting Prometheus, setting compoment status to Unknown")
+	default:
+		r.Log.Info("error getting Prometheus, setting component status to Unknown")
 		promStatus.State = mcgv1alpha1.ComponentUnknown
 	}
 
 	// Getting the status of the Alertmanager component.
 	amStatus := &r.managedMCG.Status.Components.Alertmanager
-	if err := r.get(r.alertmanager); err == nil {
+	switch err := r.get(r.alertmanager); {
+	case err == nil:
 		amStatefulSet := &appsv1.StatefulSet{}
 		amStatefulSet.Namespace = r.namespace
 		amStatefulSet.Name = fmt.Sprintf("alertmanager-%s", alertmanagerName)
@@ -394,10 +407,10 @@ func (r *ManagedMCGReconciler) updateComponentStatus() {
 		} else {
 			amStatus.State = mcgv1alpha1.ComponentPending
 		}
-	} else if errors.IsNotFound(err) {
+	case errors.IsNotFound(err):
 		amStatus.State = mcgv1alpha1.ComponentNotFound
-	} else {
-		r.Log.V(-1).Info("error getting Alertmanager, setting compoment status to Unknown")
+	default:
+		r.Log.Info("error getting Alertmanager, setting component status to Unknown")
 		amStatus.State = mcgv1alpha1.ComponentUnknown
 	}
 }
@@ -430,6 +443,7 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				} else if name == alertmanagerConfigName {
 					return true
 				}
+
 				return false
 			},
 		),
@@ -439,6 +453,7 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		predicate.NewPredicateFuncs(
 			func(client client.Object) bool {
 				labels := client.GetLabels()
+
 				return labels == nil || labels[monLabelKey] != monLabelValue
 			},
 		),
@@ -448,6 +463,7 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		predicate.NewPredicateFuncs(
 			func(client client.Object) bool {
 				name := client.GetName()
+
 				return name == r.AddonParamSecretName ||
 					name == r.PagerdutySecretName ||
 					name == r.DeadMansSnitchSecretName ||
@@ -464,7 +480,7 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		),
 	)
 
-	return ctrl.NewControllerManagedBy(mgr).
+	err := ctrl.NewControllerManagedBy(mgr).
 		For(&mcgv1alpha1.ManagedMCG{}, managedMCGPredicates).
 		// Watch non-owned resources
 		Watches(
@@ -478,7 +494,7 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			noobaaPredicates,
 		).
 		Watches(
-			&source.Kind{Type: &corev1.Secret{}},
+			&source.Kind{Type: &v1.Secret{}},
 			enqueueManagedMCGRequest,
 			secretPredicates,
 		).
@@ -488,67 +504,79 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			prometheusRulesPredicates,
 		).
 		Complete(r)
+
+	return fmt.Errorf("error setting up ManagedMCG controller: %w", err)
 }
 
 func (r *ManagedMCGReconciler) lookupImages() error {
 	noobaaCoreImage, found := os.LookupEnv("NOOBAA_CORE_IMAGE")
 	if !found {
 		return fmt.Errorf("NOOBAA_CORE_IMAGE environment variable not set")
-	} else {
-		r.images.NooBaaCore = noobaaCoreImage
 	}
+	r.images.NooBaaCore = noobaaCoreImage
 	noobaaDBImage, found := os.LookupEnv("NOOBAA_DB_IMAGE")
 	if !found {
 		return fmt.Errorf("NOOBAA_DB_IMAGE environment variable not set")
-	} else {
-		r.images.NooBaaDB = noobaaDBImage
 	}
+	r.images.NooBaaDB = noobaaDBImage
+
 	return nil
 }
 
 func (r *ManagedMCGReconciler) get(obj client.Object) error {
 	key := client.ObjectKeyFromObject(obj)
-	return r.Client.Get(r.ctx, key, obj)
+	err := r.Client.Get(r.ctx, key, obj)
+
+	return fmt.Errorf("error getting %s: %w", key, err)
 }
 
 func (r *ManagedMCGReconciler) list(obj client.ObjectList) error {
 	listOptions := client.InNamespace(r.namespace)
-	return r.Client.List(r.ctx, obj, listOptions)
+	err := r.Client.List(r.ctx, obj, listOptions)
+
+	return fmt.Errorf("error listing %s: %w", obj, err)
 }
 
 func (r *ManagedMCGReconciler) update(obj client.Object) error {
-	return r.Client.Update(r.ctx, obj)
+	err := r.Client.Update(r.ctx, obj)
+
+	return fmt.Errorf("failed to update %s: %w", obj.GetName(), err)
 }
 
 func (r *ManagedMCGReconciler) delete(obj client.Object) error {
 	if err := r.Client.Delete(r.ctx, obj); err != nil && !errors.IsNotFound(err) {
-		return err
+		return fmt.Errorf("failed to delete %s: %w", obj.GetName(), err)
 	}
+
 	return nil
 }
 
 func (r *ManagedMCGReconciler) own(resource metav1.Object) error {
 	// Ensure ManagedMCG ownership on a resource
 	if err := ctrl.SetControllerReference(r.managedMCG, resource, r.Scheme); err != nil {
-		return err
+		return fmt.Errorf("failed to set controller reference on %s: %w", resource.GetName(), err)
 	}
+
 	return nil
 }
 
 func (r *ManagedMCGReconciler) getCSVByPrefix(name string) (*opv1a1.ClusterServiceVersion, error) {
 	csvList := opv1a1.ClusterServiceVersionList{}
 	if err := r.list(&csvList); err != nil {
-		return nil, fmt.Errorf("unable to list csv resources: %v", err)
+		return nil, fmt.Errorf("unable to list csv resources: %w", err)
 	}
-	var csv *opv1a1.ClusterServiceVersion = nil
+	var csv *opv1a1.ClusterServiceVersion
 	for _, candidate := range csvList.Items {
 		if strings.HasPrefix(candidate.Name, name) {
-			csv = &candidate
+			candidateCSV := candidate
+			csv = &candidateCSV
+
 			break
 		}
 	}
 	if csv == nil {
 		return nil, fmt.Errorf("unable to get csv resources for %s ", name)
 	}
+
 	return csv, nil
 }

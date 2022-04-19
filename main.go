@@ -75,7 +75,8 @@ func main() {
 	var enableLeaderElection bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
+		"Enable leader election for controller manager. "+
+			"Enabling this will ensure there is only one active controller manager.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -156,16 +157,16 @@ func ensureManagedMCG(c client.Client, log logr.Logger, envMap map[string]string
 			Finalizers: []string{controllers.ManagedMCGFinalizer},
 		},
 	})
-	if err == nil {
+	switch {
+	case err == nil:
 		log.Info("ManagedMCG resource created")
-		return nil
 
-	} else if errors.IsAlreadyExists(err) {
-		log.Info("ManagedMCG resource exists")
 		return nil
+	case errors.IsAlreadyExists(err):
+		log.Info("ManagedMCG resource already exists")
 
-	} else {
-		log.Error(err, "failed to create ManagedMCG resource")
-		return err
+		return nil
+	default:
+		return fmt.Errorf("failed to create ManagedMCG resource: %w", err)
 	}
 }

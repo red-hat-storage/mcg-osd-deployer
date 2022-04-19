@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// This prometheus rule ensures that a DMS alert occurs during every prometheus scrape.
+// DMSPrometheusRuleTemplate This prometheus rule ensures that a DMS alert occurs during every prometheus scrape.
 var DMSPrometheusRuleTemplate = promv1.PrometheusRule{
 	Spec: promv1.PrometheusRuleSpec{
 		Groups: []promv1.RuleGroup{

@@ -23,13 +23,13 @@ import (
 type ReconcileStrategy string
 
 const (
-	// ReconcileStrategyNone disallows StorageCluster modifications
+	// ReconcileStrategyNone disallows StorageCluster modifications.
 	ReconcileStrategyNone ReconcileStrategy = "none"
-	// ReconcileStrategyStrict allows StorageCluster modifications
+	// ReconcileStrategyStrict allows StorageCluster modifications.
 	ReconcileStrategyStrict ReconcileStrategy = "strict"
 )
 
-// ManagedMCGSpec defines the desired state of ManagedMCG
+// ManagedMCGSpec defines the desired state of ManagedMCG.
 type ManagedMCGSpec struct {
 	ReconcileStrategy ReconcileStrategy `json:"reconcileStrategy,omitempty"`
 }
@@ -53,7 +53,7 @@ type ComponentStatusMap struct {
 	Alertmanager ComponentStatus `json:"alertmanager"`
 }
 
-// ManagedMCGStatus defines the observed state of ManagedMCG
+// ManagedMCGStatus defines the observed state of ManagedMCG.
 type ManagedMCGStatus struct {
 	ReconcileStrategy ReconcileStrategy  `json:"reconcileStrategy,omitempty"`
 	Components        ComponentStatusMap `json:"components"`
@@ -62,7 +62,7 @@ type ManagedMCGStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// ManagedMCG is the Schema for the managedmcgs API
+// ManagedMCG is the Schema for the managedmcgs API.
 type ManagedMCG struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

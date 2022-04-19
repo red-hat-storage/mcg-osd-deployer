@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 
-	//ocsv1 "github.com/openshift/ocs-operator/pkg/apis"
 	v1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
 	"github.com/red-hat-storage/mcg-osd-deployer/readinessProbe/readiness"
 	"k8s.io/apimachinery/pkg/runtime"

@@ -38,11 +38,19 @@ import (
 
 func newSchemeFake() *runtime.Scheme {
 	schemeFake := runtime.NewScheme()
-	clientgoscheme.AddToScheme(schemeFake)
-	mcgv1alpha1.AddToScheme(schemeFake)
-	noobaa.AddToScheme(schemeFake)
-	opv1a1.AddToScheme(schemeFake)
-	operatorv1.Install(schemeFake)
+	schemes := []func(*runtime.Scheme) error{
+		clientgoscheme.AddToScheme,
+		noobaa.AddToScheme,
+		opv1a1.AddToScheme,
+		mcgv1alpha1.AddToScheme,
+		operatorv1.Install,
+	}
+	for _, f := range schemes {
+		if err := f(schemeFake); err != nil {
+			panic(err)
+		}
+	}
+
 	return schemeFake
 }
 
@@ -68,6 +76,7 @@ func newODFCSVFake() opv1a1.ClusterServiceVersion {
 			},
 		},
 	}
+
 	return ODFCSVFake
 }
 
@@ -82,6 +91,7 @@ func newManagedMCGFake() mcgv1alpha1.ManagedMCG {
 			ReconcileStrategy: "ignore",
 		},
 	}
+
 	return managedMCGFake
 }
 
@@ -108,6 +118,6 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 		},
 	})
 	if err != nil {
-		t.Errorf("ManagedMCGReconciler.Reconcile() error: %v", err)
+		t.Errorf("ManagedMCGReconciler.Reconcile() error: %s", err)
 	}
 }

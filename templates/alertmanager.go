@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// AlertmanagerTemplate is the template that serves as the base for the Alert Manager deployed by the operator
+// AlertmanagerTemplate is the template that serves as the base for the Alert Manager deployed by the operator.
 var _1 = int32(1)
 
 var AlertmanagerTemplate = promv1.Alertmanager{

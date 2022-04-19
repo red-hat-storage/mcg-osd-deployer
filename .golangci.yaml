@@ -1,0 +1,99 @@
+run:
+  concurrency: 8
+  go: "1.17"
+output:
+  sort-results: true
+  format: tab
+issues:
+  exclude-rules:
+    - linters:
+        - lll
+      source: "^//.kubebuilder:.*"
+    - linters:
+        - varnamelen
+      text: "variable name 'r'"
+    - linters:
+        - gosec
+      text: "G101: "
+    - linters:
+        - gomoddirectives
+      text: "replacement"
+    - linters:
+        - gci
+      text: "^Expected '\\w|\\.'.*"
+  fix: true
+linters-settings:
+  lll:
+    line-length: 120
+  gci:
+    no-inline-comments: true
+    no-prefix-comments: true
+linters:
+  enable:
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - deadcode
+    - depguard
+    - dogsled
+    - dupl
+    - durationcheck
+    - errcheck
+    - errname
+    - errorlint
+    - exhaustive
+    - exportloopref
+    - forbidigo
+    - forcetypeassert
+    - gci
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    - godot
+    - godox
+    - gofmt
+    - gofumpt
+    - goheader
+    - goimports
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - ifshort
+    - importas
+    - ineffassign
+    - ireturn
+    - lll
+    - makezero
+    - misspell
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnil
+    - nlreturn
+    - noctx
+    - nolintlint
+    - prealloc
+    - predeclared
+    - promlinter
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - staticcheck
+    - structcheck
+    - stylecheck
+    - tagliatelle
+    - tenv
+    - thelper
+    - tparallel
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - varnamelen
+    - wastedassign
+    - whitespace
+    - wrapcheck
