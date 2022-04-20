@@ -566,10 +566,9 @@ func (r *ManagedMCGReconciler) getCSVByPrefix(name string) (*opv1a1.ClusterServi
 		return nil, fmt.Errorf("unable to list csv resources: %w", err)
 	}
 	var csv *opv1a1.ClusterServiceVersion
-	for _, candidate := range csvList.Items {
-		if strings.HasPrefix(candidate.Name, name) {
-			candidateCSV := candidate
-			csv = &candidateCSV
+	for i := range csvList.Items {
+		if strings.HasPrefix(csvList.Items[i].Name, name) {
+			csv = &csvList.Items[i]
 
 			break
 		}
