@@ -26,5 +26,7 @@ if ! command -v golangci-lint > /dev/null; then
   exit 1
 fi
 
+echo "PATH: $PATH"
 PROJECT_ROOT=$(realpath "$(dirname "$0")"/../)
-golangci-lint -c "$PROJECT_ROOT"/.golangci.yaml run "$PROJECT_ROOT"/...
+echo "PROJECT_ROOT: $PROJECT_ROOT"
+golangci-lint -c "$PROJECT_ROOT"/.golangci.yaml run -v "$PROJECT_ROOT"/...
