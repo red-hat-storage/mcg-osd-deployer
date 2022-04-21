@@ -23,10 +23,8 @@ if ! command -v golangci-lint > /dev/null; then
   echo "golangci-lint is not installed, installing..."
   # Fetch golangci-lint binary
   curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b "$(go env GOPATH)"/bin v1.45.2
-  exit 1
 fi
 
-echo "PATH: $PATH"
+echo "Running golangci-lint..."
 PROJECT_ROOT=$(realpath "$(dirname "$0")"/../)
-echo "PROJECT_ROOT: $PROJECT_ROOT"
-golangci-lint -c "$PROJECT_ROOT"/.golangci.yaml run -v "$PROJECT_ROOT"/...
+golangci-lint -c "$PROJECT_ROOT"/.golangci.yaml run "$PROJECT_ROOT"/...
