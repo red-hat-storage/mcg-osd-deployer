@@ -47,6 +47,9 @@ func RunServer(client client.Client, managedMCGResource types.NamespacedName, lo
 	})
 
 	err := http.ListenAndServe(listenAddr, nil)
+	if err != nil {
+		return fmt.Errorf("error while running readiness server: %w", err)
+	}
 
-	return fmt.Errorf("error while running readiness server: %w", err)
+	return nil
 }
