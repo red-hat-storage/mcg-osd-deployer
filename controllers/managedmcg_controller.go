@@ -284,8 +284,11 @@ func (r *ManagedMCGReconciler) reconcileNoobaaComponent() error {
 
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("failed to reconcile Noobaa: %w", err)
+	}
 
-	return fmt.Errorf("failed to reconcile Noobaa: %w", err)
+	return nil
 }
 
 func (r *ManagedMCGReconciler) reconcileOCSCSV() error {
@@ -504,8 +507,11 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			prometheusRulesPredicates,
 		).
 		Complete(r)
+	if err != nil {
+		return fmt.Errorf("error setting up ManagedMCG controller: %w", err)
+	}
 
-	return fmt.Errorf("error setting up ManagedMCG controller: %w", err)
+	return nil
 }
 
 func (r *ManagedMCGReconciler) lookupImages() error {

@@ -120,8 +120,11 @@ func (r *ManagedMCGReconciler) reconcileDMSPrometheusRule() error {
 
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("failed to reconcile DMS Prometheus Rule: %w", err)
+	}
 
-	return fmt.Errorf("failed to reconcile DMS Prometheus Rule: %w", err)
+	return nil
 }
 
 // reconcileMonitoringResources labels all monitoring resources (ServiceMonitors, PodMonitors, and PrometheusRules)
@@ -174,21 +177,9 @@ func (r *ManagedMCGReconciler) reconcileAlertmanagerConfig() error {
 	r.Log.Info("Reconciling AlertmanagerConfig secret")
 
 	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.alertmanagerConfig, func() error {
-		if err := r.own(r.alertmanagerConfig); err != nil {
-			return fmt.Errorf("failed to own AlertmanagerConfig secret: %w", err)
-		}
-
-		if err := r.get(r.pagerdutySecret); err != nil {
-			return fmt.Errorf("unable to get pagerduty secret: %w", err)
-		}
-
-		if string(r.pagerdutySecret.Data["PAGERDUTY_KEY"]) == "" {
-			return fmt.Errorf("pagerduty secret does not contain a PAGERDUTY_KEY entry")
-		}
-
-		err := r.get(r.deadMansSnitchSecret)
-		if r.deadMansSnitchSecret.UID == "" && err != nil {
-			return fmt.Errorf("unable to get DeadMansSnitch secret: %w", err)
+		err := r.checkPrerequisites()
+		if err != nil {
+			return err
 		}
 
 		dmsURL := string(r.deadMansSnitchSecret.Data["SNITCH_URL"])
@@ -229,8 +220,32 @@ func (r *ManagedMCGReconciler) reconcileAlertmanagerConfig() error {
 
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("unable to update alertmanager config: %w", err)
+	}
 
-	return fmt.Errorf("unable to update alertmanager config: %w", err)
+	return nil
+}
+
+func (r *ManagedMCGReconciler) checkPrerequisites() error {
+	if err := r.own(r.alertmanagerConfig); err != nil {
+		return fmt.Errorf("failed to own AlertmanagerConfig secret: %w", err)
+	}
+
+	if err := r.get(r.pagerdutySecret); err != nil {
+		return fmt.Errorf("unable to get pagerduty secret: %w", err)
+	}
+
+	if string(r.pagerdutySecret.Data["PAGERDUTY_KEY"]) == "" {
+		return fmt.Errorf("pagerduty secret does not contain a PAGERDUTY_KEY entry")
+	}
+
+	err := r.get(r.deadMansSnitchSecret)
+	if r.deadMansSnitchSecret.UID == "" && err != nil {
+		return fmt.Errorf("unable to get DeadMansSnitch secret: %w", err)
+	}
+
+	return nil
 }
 
 func (r *ManagedMCGReconciler) configReceiver(dmsURL string, alertingAddressList []string, smtpHTML []byte) {
