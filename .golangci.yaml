@@ -18,9 +18,6 @@ issues:
     - linters:
         - gomoddirectives
       text: "replacement"
-    - linters:
-        - gci
-      text: "^Expected '\\w|\\.'.*"
   fix: true
 linters-settings:
   lll:
@@ -45,7 +42,6 @@ linters:
     - exportloopref
     - forbidigo
     - forcetypeassert
-    - gci
     - gocognit
     - goconst
     - gocritic

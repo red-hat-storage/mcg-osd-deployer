@@ -261,7 +261,6 @@ func (r *ManagedMCGReconciler) configReceiver(dmsURL string, alertingAddressList
 		case "DeadMansSnitch":
 			receiver.WebhookConfigs[0].URL = &dmsURL
 		case "SendGrid":
-			receiver.EmailConfigs = []promv1a1.EmailConfig{}
 			if len(alertingAddressList) > 0 {
 				receiver.EmailConfigs[0].Smarthost = fmt.Sprintf("%s:%s", r.smtpSecret.Data["host"], r.smtpSecret.Data["port"])
 				receiver.EmailConfigs[0].AuthUsername = string(r.smtpSecret.Data["username"])
