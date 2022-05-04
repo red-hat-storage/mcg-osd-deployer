@@ -8,8 +8,9 @@ fi
 
 # Check if $GOBIN is set
 if [ -z "$(go env GOBIN)" ]; then
-  echo "GOBIN is not set"
-  exit 1
+  echo "GOBIN is not set, using GOPATH/bin"
+  GOBIN=$(go env GOPATH)/bin
+  export GOBIN
 fi
 
 # Check if golangci-lint binary is available
