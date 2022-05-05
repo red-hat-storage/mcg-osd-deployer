@@ -36,6 +36,12 @@ ARCH = $(shell go env GOARCH)
 
 all: manager
 
+# Estimate coverage
+coverage:
+	go get golang.org/x/tools/cmd/cover
+	NOOBAA_CORE_IMAGE={NOOBAA_CORE_IMAGE} NOOBAA_DB_IMAGE={NOOBAA_DB_IMAGE} go test -coverprofile coverage.out ./...
+	go tool cover -func coverage.out
+
 # Run linters
 lint:
 	hack/hooks/pre-commit
