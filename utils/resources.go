@@ -9,21 +9,21 @@ import (
 var ResourceRequirements = map[string]corev1.ResourceRequirements{
 	"noobaa-core": {
 		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("3"),
+			corev1.ResourceCPU:    resource.MustParse("1"),
 			corev1.ResourceMemory: resource.MustParse("4Gi"),
 		},
 		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("3"),
+			corev1.ResourceCPU:    resource.MustParse("1"),
 			corev1.ResourceMemory: resource.MustParse("4Gi"),
 		},
 	},
 	"noobaa-db": {
 		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("3"),
+			corev1.ResourceCPU:    resource.MustParse("500m"),
 			corev1.ResourceMemory: resource.MustParse("4Gi"),
 		},
 		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("3"),
+			corev1.ResourceCPU:    resource.MustParse("500m"),
 			corev1.ResourceMemory: resource.MustParse("4Gi"),
 		},
 	},
@@ -34,12 +34,12 @@ var ResourceRequirements = map[string]corev1.ResourceRequirements{
 	},
 	"noobaa-endpoint": {
 		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("3"),
-			corev1.ResourceMemory: resource.MustParse("4Gi"),
+			corev1.ResourceCPU:    resource.MustParse("1"),
+			corev1.ResourceMemory: resource.MustParse("2Gi"),
 		},
 		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("3"),
-			corev1.ResourceMemory: resource.MustParse("4Gi"),
+			corev1.ResourceCPU:    resource.MustParse("1"),
+			corev1.ResourceMemory: resource.MustParse("2Gi"),
 		},
 	},
 	"prometheus": {

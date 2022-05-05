@@ -10,7 +10,7 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: ManagedMCG is the Schema for the managedmcgs API
+    - description: ManagedMCG is the Schema for the managedmcgs API.
       displayName: Managed MCG
       kind: ManagedMCG
       name: managedmcgs.mcg.openshift.io

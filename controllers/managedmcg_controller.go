@@ -21,24 +21,31 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	noobaav1alpha1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
+	noobaacrds "github.com/noobaa/noobaa-operator/v5/pkg/crd"
+	noobaautil "github.com/noobaa/noobaa-operator/v5/pkg/util"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	promv1a1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	mcgv1alpha1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
+	"github.com/red-hat-storage/mcg-osd-deployer/crds"
 	"github.com/red-hat-storage/mcg-osd-deployer/templates"
 	"github.com/red-hat-storage/mcg-osd-deployer/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -88,6 +95,7 @@ type ManagedMCGReconciler struct {
 	alertmanager             *promv1.Alertmanager
 	PagerdutySecretName      string
 	dmsRule                  *promv1.PrometheusRule
+	ObjectBucketClaim        *noobaav1alpha1.ObjectBucketClaim
 }
 
 func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
@@ -102,6 +110,8 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 	r.noobaa = &noobaav1alpha1.NooBaa{}
 	r.noobaa.Name = noobaaName
 	r.noobaa.Namespace = r.namespace
+
+	r.ObjectBucketClaim = &noobaav1alpha1.ObjectBucketClaim{}
 	r.initializePrometheusReconciler()
 }
 
@@ -111,6 +121,8 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 //+kubebuilder:rbac:groups="",namespace=system,resources=secrets,verbs=get;list;watch;create
 //+kubebuilder:rbac:groups="coordination.k8s.io",namespace=system,resources=leases,verbs=create;get;list;watch;update
 //+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=noobaas,verbs=get;list;watch;create;update;delete
+//+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources={bucketclasses,bucketclass},verbs=get;list;watch;
+//+kubebuilder:rbac:groups=objectbucket.io,namespace=system,resources={objectbucketclaims,objectbucketclaim},verbs=get;list;watch;create;
 //+kubebuilder:rbac:groups=operators.coreos.com,namespace=system,resources=clusterserviceversions,verbs=get;list;watch;update;delete
 
 //+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources={alertmanagers,prometheuses,alertmanagerconfigs},verbs=get;list;watch;create;update
@@ -127,7 +139,7 @@ func (r *ManagedMCGReconciler) Reconcile(_ context.Context, req ctrl.Request) (c
 	r.initializeReconciler(req)
 	if err := r.get(r.managedMCG); err != nil {
 		if errors.IsNotFound(err) {
-			r.Log.Info("ManagedMCG resource not found")
+			r.Log.Info("ManagedMCG resource not found.")
 		} else {
 			return ctrl.Result{}, err
 		}
@@ -483,6 +495,35 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		),
 	)
 
+	bucketclassPredicates := builder.WithPredicates(
+		predicate.Funcs{
+			CreateFunc: func(e event.CreateEvent) bool {
+				AdditionalConfigMap := make(map[string]string)
+				AdditionalConfigMap["bucketclass"] = e.Object.GetName()
+				obc := noobaav1alpha1.ObjectBucketClaim{
+					Spec: noobaav1alpha1.ObjectBucketClaimSpec{
+						BucketName:         e.Object.GetName(),
+						StorageClassName:   "redhat-data-federation.noobaa.io",
+						GenerateBucketName: e.Object.GetName(),
+						AdditionalConfig:   AdditionalConfigMap,
+					},
+				}
+				r.ObjectBucketClaim.Name = e.Object.GetName()
+				r.ObjectBucketClaim.Namespace = "redhat-data-federation"
+				result, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.ObjectBucketClaim, func() error {
+					r.Log.Info("creating/updating OBC CR", "name", r.ObjectBucketClaim.Name)
+					r.ObjectBucketClaim.Spec = obc.Spec
+					return nil
+				})
+				fmt.Println("result********************", result)
+				if err != nil {
+					return false
+				}
+				return true
+			},
+		},
+	)
+
 	err := ctrl.NewControllerManagedBy(mgr).
 		For(&mcgv1alpha1.ManagedMCG{}, managedMCGPredicates).
 		// Watch non-owned resources
@@ -505,6 +546,11 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&source.Kind{Type: &promv1.PrometheusRule{}},
 			enqueueManagedMCGRequest,
 			prometheusRulesPredicates,
+		).
+		Watches(
+			&source.Kind{Type: &noobaav1alpha1.BucketClass{}},
+			enqueueManagedMCGRequest,
+			bucketclassPredicates,
 		).
 		Complete(r)
 	if err != nil {
@@ -593,4 +639,65 @@ func (r *ManagedMCGReconciler) getCSVByPrefix(name string) (*opv1a1.ClusterServi
 	}
 
 	return csv, nil
+}
+
+func LoadCrds() *noobaacrds.Crds {
+	obc := noobaautil.KubeObject(crds.File_deploy_obc_objectbucket_io_objectbucketclaims_crd_yaml)
+	ob := noobaautil.KubeObject(crds.File_deploy_obc_objectbucket_io_objectbuckets_crd_yaml)
+	crds := &noobaacrds.Crds{
+		ObjectBucketClaim: obc.(*noobaacrds.CRD),
+		ObjectBucket:      ob.(*noobaacrds.CRD),
+	}
+	crds.All = []*noobaacrds.CRD{
+		crds.ObjectBucketClaim,
+		crds.ObjectBucket,
+	}
+	return crds
+}
+
+// WaitAllReady waits for all CRDs to be ready
+func WaitAllReady() {
+	log := noobaautil.Logger()
+	klient := noobaautil.KubeClient()
+	crds := LoadCrds()
+	intervalSec := time.Duration(3)
+	noobaautil.Panic(wait.PollImmediateInfinite(intervalSec*time.Second, func() (bool, error) {
+		allReady := true
+		for _, crd := range crds.All {
+			err := klient.Get(noobaautil.Context(), client.ObjectKey{Name: crd.Name}, crd)
+			noobaautil.Panic(err)
+			ready, err := IsReady(crd)
+			if err != nil {
+				log.Printf("❌ %s", err)
+				allReady = false
+				continue
+			}
+			if !ready {
+				log.Printf("❌ CRD is not ready. Need to wait ...")
+				allReady = false
+				continue
+			}
+		}
+		return allReady, nil
+	}))
+}
+
+// IsReady checks the status of a CRD
+func IsReady(crd *noobaacrds.CRD) (bool, error) {
+	for _, cond := range crd.Status.Conditions {
+		switch cond.Type {
+		case apiextv1.NamesAccepted:
+			if cond.Status == apiextv1.ConditionFalse {
+				return false, fmt.Errorf("CRD Name conflict: %v", cond.Reason)
+			}
+			if cond.Status != apiextv1.ConditionTrue {
+				return false, nil
+			}
+		case apiextv1.Established:
+			if cond.Status != apiextv1.ConditionTrue {
+				return false, nil
+			}
+		}
+	}
+	return true, nil
 }
