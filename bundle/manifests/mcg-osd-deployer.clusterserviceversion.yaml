@@ -14,7 +14,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    operators.operatorframework.io/builder: operator-sdk-v1.18.1
+    operators.operatorframework.io/builder: operator-sdk-v1.18.0+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: mcg-osd-deployer.v1.0.0
   namespace: placeholder
@@ -22,7 +22,7 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: ManagedMCG is the Schema for the managedmcgs API
+    - description: ManagedMCG is the Schema for the managedmcgs API.
       displayName: Managed MCG
       kind: ManagedMCG
       name: managedmcgs.mcg.openshift.io
@@ -110,7 +110,7 @@ spec:
                   value: quay.io/noobaa/noobaa-core:5.9-20220206
                 - name: NOOBAA_DB_IMAGE
                   value: quay.io/centos7/postgresql-12-centos7:centos7
-                image: quay.io/osd-addons/mcg-osd:0.1.0
+                image: quay.io/napaul/mcg-osd-deployer:v.10
                 name: manager
                 resources:
                   limits:
@@ -126,7 +126,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
-                image: quay.io/osd-addons/mcg-osd:0.1.0
+                image: quay.io/napaul/mcg-osd-deployer:v.10
                 name: readiness-server
                 readinessProbe:
                   httpGet:
@@ -228,6 +228,15 @@ spec:
         - apiGroups:
           - noobaa.io
           resources:
+          - bucketclass
+          - bucketclasses
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - noobaa.io
+          resources:
           - noobaas
           verbs:
           - create
@@ -235,6 +244,16 @@ spec:
           - get
           - list
           - update
+          - watch
+        - apiGroups:
+          - objectbucket.io
+          resources:
+          - objectbucketclaim
+          - objectbucketclaims
+          verbs:
+          - create
+          - get
+          - list
           - watch
         - apiGroups:
           - operators.coreos.com

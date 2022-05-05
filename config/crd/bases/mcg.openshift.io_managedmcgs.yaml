@@ -19,7 +19,7 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ManagedMCG is the Schema for the managedmcgs API
+        description: ManagedMCG is the Schema for the managedmcgs API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -34,13 +34,13 @@ spec:
           metadata:
             type: object
           spec:
-            description: ManagedMCGSpec defines the desired state of ManagedMCG
+            description: ManagedMCGSpec defines the desired state of ManagedMCG.
             properties:
               reconcileStrategy:
                 type: string
             type: object
           status:
-            description: ManagedMCGStatus defines the observed state of ManagedMCG
+            description: ManagedMCGStatus defines the observed state of ManagedMCG.
             properties:
               components:
                 properties:
