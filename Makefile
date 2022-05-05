@@ -38,7 +38,8 @@ all: manager
 
 # Estimate coverage
 coverage: test
-	go tool cover -func coverage.out
+	go tool cover -func coverage.out >> coverage.txt
+	cat coverage.txt
 
 # Run linters
 lint:
