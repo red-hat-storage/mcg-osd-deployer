@@ -20,7 +20,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"context"
+
 	"github.com/red-hat-storage/mcg-osd-deployer/controllers"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -33,12 +37,17 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	mcgopenshiftiov1alpha1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
+
+const (
+	Namespace = "redhat-data-federation"
+)
 
 var (
 	k8sClient client.Client
@@ -65,6 +74,9 @@ var _ = BeforeSuite(func() {
 	cfg, err := testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
+
+	err = opv1a1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
 
 	err = mcgopenshiftiov1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
@@ -97,6 +109,15 @@ var _ = BeforeSuite(func() {
 		err = mgr.Start(ctrl.SetupSignalHandler())
 		Expect(err).ToNot(HaveOccurred())
 	}()
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: Namespace,
+		},
+	}
+	err = k8sClient.Create(context.Background(), namespace, &client.CreateOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
 }, 60)
 
 var _ = AfterSuite(func() {
