@@ -20,7 +20,6 @@ import (
 	//
 	_ "github.com/go-openapi/spec"
 	"github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
-	noobaa "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
