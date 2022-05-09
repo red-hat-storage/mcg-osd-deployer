@@ -20,7 +20,6 @@ import (
 	//
 	_ "github.com/go-openapi/spec"
 	"github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
-	noobaa "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -28,7 +27,7 @@ import (
 // NoobaaTemplate is the template that serves as the base for the storage clsuter deployed by the operator
 
 var AWSSTSARN = "arn:aws:iam::495507785675:role/STS-New"
-var NoobaaTemplate = &noobaa.NooBaa{
+var NoobaaTemplate = &v1alpha1.NooBaa{
 
 	Spec: noobaa.NooBaaSpec{
 		DefaultBackingStoreSpec: &noobaa.BackingStoreSpec{
@@ -46,7 +45,7 @@ var NoobaaTemplate = &noobaa.NooBaa{
 			},
 			Type: noobaa.StoreTypePVPool,
 		},
-		Endpoints: &noobaa.EndpointsSpec{
+		Endpoints: &v1alpha1.EndpointsSpec{
 			MinCount: 1,
 			MaxCount: 2,
 			Resources: &v1.ResourceRequirements{
