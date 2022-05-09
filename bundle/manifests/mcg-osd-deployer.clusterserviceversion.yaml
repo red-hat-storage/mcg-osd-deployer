@@ -14,6 +14,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
+    console.openshift.io/plugins: '["mcg-ms-console"]'
     operators.operatorframework.io/builder: operator-sdk-v1.18.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: mcg-osd-deployer.v1.0.0
@@ -36,6 +37,48 @@ spec:
     spec:
       clusterPermissions:
       - rules:
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - clusterversions
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - clusterversions/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - console.openshift.io
+          resources:
+          - consoleplugins
+          verbs:
+          - '*'
         - apiGroups:
           - mcg.openshift.io
           resources:
@@ -86,7 +129,7 @@ spec:
                 - --secure-listen-address=0.0.0.0:8443
                 - --upstream=http://127.0.0.1:8080/
                 - --logtostderr=true
-                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.11.0
                 name: kube-rbac-proxy
                 ports:
                 - containerPort: 8443
@@ -152,6 +195,40 @@ spec:
                     memory: 30Mi
               serviceAccountName: deployer
               terminationGracePeriodSeconds: 10
+      - name: mcg-ms-console
+        spec:
+          selector:
+            matchLabels:
+              app: mcg-ms-console
+          strategy: {}
+          template:
+            metadata:
+              labels:
+                app: mcg-ms-console
+            spec:
+              containers:
+              - image: quay.io/skatiyar/mcg-ms-console:latest
+                name: mcg-ms-console
+                ports:
+                - containerPort: 9002
+                  protocol: TCP
+                resources:
+                  limits:
+                    cpu: 100m
+                    memory: 512Mi
+                volumeMounts:
+                - mountPath: /var/serving-cert
+                  name: mcg-ms-console-serving-cert
+                  readOnly: true
+              tolerations:
+              - effect: NoSchedule
+                key: node.ocs.openshift.io/storage
+                operator: Equal
+                value: "true"
+              volumes:
+              - name: mcg-ms-console-serving-cert
+                secret:
+                  secretName: mcg-ms-console-serving-cert
       permissions:
       - rules:
         - apiGroups:
@@ -167,11 +244,25 @@ spec:
         - apiGroups:
           - ""
           resources:
+          - endpoints
+          - services
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
           - secrets
           verbs:
           - create
           - get
           - list
+          - update
           - watch
         - apiGroups:
           - apps
@@ -232,6 +323,16 @@ spec:
           - get
           - list
           - patch
+          - update
+          - watch
+        - apiGroups:
+          - networking.k8s.io
+          resources:
+          - networkpolicies
+          verbs:
+          - create
+          - get
+          - list
           - update
           - watch
         - apiGroups:

@@ -71,3 +71,12 @@ func AddLabel(obj metav1.Object, key string, value string) {
 func GetRegexMatcher(alerts []string) string {
 	return "^" + strings.Join(alerts, "$|^") + "$"
 }
+
+func AddAnnotation(obj metav1.Object, key string, value string) {
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+		obj.SetAnnotations(annotations)
+	}
+	annotations[key] = value
+}
