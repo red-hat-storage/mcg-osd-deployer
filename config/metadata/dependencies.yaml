@@ -3,7 +3,3 @@ dependencies:
   value:
     packageName: ose-prometheus-operator
     version: "4.8.0"
-- type: olm.package
-  value:
-    packageName: mcg-operator
-    version: "4.9.3"
