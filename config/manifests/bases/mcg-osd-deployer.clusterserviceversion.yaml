@@ -10,6 +10,16 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - description: OBC the Schema for the managedmcgs OBCs.
+      displayName: objectbucketclaim
+      kind: ObjectBucketClaim
+      name: objectbucketclaims.objectbucket.io
+      version: v1alpha1
+    - description: OB the Schema for the managedmcgs OBs.
+      displayName: objectbucket
+      kind: ObjectBucket
+      name: objectbuckets.objectbucket.io
+      version: v1alpha1
     - description: ManagedMCG is the Schema for the managedmcgs API.
       displayName: Managed MCG
       kind: ManagedMCG
