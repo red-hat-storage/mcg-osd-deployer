@@ -138,6 +138,7 @@ func newOcsCsvFake() opv1a1.ClusterServiceVersion {
 	return ocscsv
 }
 
+// Remove extraneous artifacts after tests are executed.
 func cleanup() {
 	os.Remove(CustomerNotificationHTMLPath)
 }
@@ -170,7 +171,6 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 		&smtpsecretfake, &addonsecretFake, &deadmansercretFake, &pagerdutysecretFake, &managedMCGFake).Build()
 
 	r.Client = fakeClient
-
 	r.Log.Info("Reconciling ManagedMCG object")
 	_, err = r.Reconcile(context.Background(), reconcile.Request{
 		NamespacedName: types.NamespacedName{
@@ -181,8 +181,27 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 	if err != nil {
 		t.Errorf("ManagedMCGReconciler.Reconcile() error: %v", err)
 	}
+
+	t.Setenv("NOOBAA_CORE_IMAGE", "coreimage")
+	t.Setenv("NOOBAA_DB_IMAGE", "dbimage")
+	err = r.lookupImages()
+	if err != nil || r.images.NooBaaCore != "coreimage" || r.images.NooBaaDB != "dbimage" {
+		t.Errorf("Failed to lookup images: %v", err)
+	}
+
+	r.managedMCG.UID = ""
+	_, err = r.reconcilePhases()
+	if err != nil {
+		r.Log.Error(err, "error reconciling ManagedMCG")
+	}
+
 	if err := r.removeNoobaa(); err != nil {
 		t.Errorf("Error while removing Nooba: %v", err)
 	}
+
+	if err := r.removeOLMComponents(); err != nil {
+		t.Errorf("Error while removing OLM: %v", err)
+	}
+
 	cleanup()
 }
