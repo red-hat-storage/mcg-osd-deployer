@@ -37,19 +37,23 @@ var (
 
 var _ = Describe("ManagedMCG validations", func() {
 	When("Creating and deleting ManagedMCG", func() {
-		// ns := &corev1.Namespace{
-		// 	ObjectMeta: metav1.ObjectMeta{
-		// 		Name: namespace,
-		// 	},
-		// }
-		// BeforeEach(func() {
-		// 	err := k8sClient.Create(context.Background(), ns, &client.CreateOptions{})
-		// 	Expect(err).NotTo(HaveOccurred())
-		// })
-		// AfterEach(func() {
-		// 	err := k8sClient.Delete(context.Background(), ns, &client.DeleteOptions{})
-		// 	Expect(err).NotTo(HaveOccurred())
-		// })
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespace,
+			},
+		}
+
+		BeforeEach(func() {
+			err := k8sClient.Create(context.Background(), ns, &client.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+		})
+		AfterEach(func() {
+			err := k8sClient.Delete(context.Background(), ns, &client.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(func() bool {
+				return k8sClient.Get(context.Background(), types.NamespacedName{}, ns) != nil
+			}, "30s").Should(BeFalse())
+		})
 		It("should not return validation error", func() {
 			By("using default values", func() {
 				newManagedMCG := managedMCG.DeepCopy()
@@ -64,12 +68,11 @@ var _ = Describe("ManagedMCG validations", func() {
 
 var _ = Describe("ManagedMCGReconciler Reconcile", func() {
 	When("Creating ManagedMCG", func() {
-
-		// ns := &corev1.Namespace{
-		// 	ObjectMeta: metav1.ObjectMeta{
-		// 		Name: namespace,
-		// 	},
-		// }
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespace,
+			},
+		}
 
 		addonSecretFake := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -117,7 +120,7 @@ var _ = Describe("ManagedMCGReconciler Reconcile", func() {
 			},
 		}
 
-		noobaacsv := noobaav1alpha1.NooBaa{
+		noobacsv := noobaav1alpha1.NooBaa{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "nooba-operator",
 				Namespace: namespace,
@@ -125,11 +128,11 @@ var _ = Describe("ManagedMCGReconciler Reconcile", func() {
 		}
 
 		BeforeEach(func() {
-			// err := k8sClient.Create(context.Background(), ns, &client.CreateOptions{})
-			// Expect(err).NotTo(HaveOccurred())
+			err := k8sClient.Create(context.Background(), ns, &client.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
 
 			newManagedMCG := managedMCG.DeepCopy()
-			err := k8sClient.Create(context.Background(), newManagedMCG, &client.CreateOptions{})
+			err = k8sClient.Create(context.Background(), newManagedMCG, &client.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -151,16 +154,16 @@ var _ = Describe("ManagedMCGReconciler Reconcile", func() {
 			// err = fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).Build().Delete(context.Background(), &noobaacsv, &client.DeleteOptions{})
 			// Expect(err).NotTo(HaveOccurred())
 
-			// err = k8sClient.Delete(context.Background(), ns, &client.DeleteOptions{})
-			// Expect(err).NotTo(HaveOccurred())
+			err = k8sClient.Delete(context.Background(), ns, &client.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
 		})
-		It("should be able to reconclie ManagedMCG object", func() {
+		It("should be able to reconcile ManagedMCG object", func() {
 			By("providing valid ManagedMCG params", func() {
 
 				r := &controllers.ManagedMCGReconciler{
 					Scheme: k8sClient.Scheme(),
 					Log:    ctrl.Log.WithName("controllers").WithName("ManagedMCGFake"),
-					Client: fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(&ocscsv, &smtpSecretFake, &addonSecretFake, &deadMansSecretfake, &pagerDutySecretFake, &noobaacsv).Build(),
+					Client: fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(&ocscsv, &smtpSecretFake, &addonSecretFake, &deadMansSecretfake, &pagerDutySecretFake, &noobacsv).Build(),
 				}
 
 				req := ctrl.Request{
