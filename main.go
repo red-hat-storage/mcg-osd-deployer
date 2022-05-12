@@ -52,13 +52,6 @@ var (
 	setupLog = ctrl.Log.WithName("setup")
 )
 
-const (
-	namespaceKey         = "NAMESPACE"
-	addonNameKey         = "ADDON_NAME"
-	sopEndpointKey       = "SOP_ENDPOINT"
-	alertSMTPFromAddrKey = "ALERT_SMTP_FROM_ADDR"
-)
-
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(mcgv1alpha1.AddToScheme(scheme))
