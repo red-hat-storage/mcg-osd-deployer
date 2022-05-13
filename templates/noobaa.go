@@ -26,7 +26,6 @@ import (
 
 // NoobaaTemplate is the template that serves as the base for the storage clsuter deployed by the operator
 
-var AWSSTSARN = "arn:aws:iam::495507785675:role/STS-New"
 var NoobaaTemplate = &v1alpha1.NooBaa{
 
 	Spec: noobaa.NooBaaSpec{

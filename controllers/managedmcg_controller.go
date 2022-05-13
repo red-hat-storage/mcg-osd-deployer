@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+	"github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	noobaav1alpha1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -50,9 +51,12 @@ const (
 	ManagedMCGFinalizer = "managedmcg.openshift.io"
 	ManagedMCGName      = "managedmcg"
 
-	deployerCSVPrefix = "mcg-osd-deployer"
-	noobaaFinalizer   = "noobaa.io/graceful_finalizer"
-	noobaaName        = "noobaa"
+	deployerCSVPrefix   = "mcg-osd-deployer"
+	noobaaFinalizer     = "noobaa.io/graceful_finalizer"
+	noobaaName          = "noobaa"
+	McgmsObcNamespace   = "mcgms-obc-namespace"
+	McgmsCacheEnabled   = "mcgms-cache-enabled"
+	DefaultBackingStore = "noobaa-default-backing-store"
 )
 
 type ImageMap struct {
@@ -109,8 +113,8 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 	r.objectBucketClaim = &noobaav1alpha1.ObjectBucketClaim{}
 	r.bucketClass = &noobaav1alpha1.BucketClass{}
 	r.bucketClass.Namespace = r.namespace
-
 	r.initializePrometheusReconciler()
+
 }
 
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources={managedmcgs,managedmcgs/finalizers},verbs=get;list;watch;create;update;patch;delete
@@ -242,7 +246,6 @@ func (r *ManagedMCGReconciler) updateAddonParams() error {
 	for key, value := range addonParamSecret.Data {
 		r.addonParams[key] = string(value)
 	}
-
 	return nil
 }
 
@@ -355,8 +358,8 @@ func (r *ManagedMCGReconciler) setNoobaaDesiredState(desiredNoobaa *noobaav1alph
 		AdditionalVirtualHosts: []string{},
 		Resources:              &endpointResources,
 	}
-	awsSTSARN := r.addonParams["aws-sts-arn"]
-	desiredNoobaa.Spec.DefaultBackingStoreSpec.AWSS3.AWSSTSRoleARN = &awsSTSARN
+	//awsSTSARN := r.addonParams["aws-sts-arn"]
+	//desiredNoobaa.Spec.DefaultBackingStoreSpec.AWSS3.AWSSTSRoleARN = &awsSTSARN
 }
 
 func (r *ManagedMCGReconciler) updateComponentStatus() {
@@ -555,6 +558,92 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	return nil
+}
+
+func (r *ManagedMCGReconciler) reconcileCachebucketClass(object client.Object) {
+	r.Log.Info("Create Cache bucketClass for cache enabled namespacestores", "name", object.GetName())
+	bucketClass := r.setCachebucketClassDesiredState(object)
+	if bucketClass == nil {
+		r.Log.Info("No Cache bucketClass returned for Cache enabled Bucket", "name", bucketClass.Name)
+		return
+	}
+	bucketClass.Name = object.GetName() + "-cache"
+	bucketClass.Namespace = r.namespace
+	result, err := ctrl.CreateOrUpdate(r.ctx, r.Client, bucketClass, func() error {
+		r.Log.Info("creating/updating bucketClass CR", "name", bucketClass.Name)
+		return nil
+	})
+	if err != nil || result == "unchanged" {
+		r.Log.Error(err, "Error while creating OBC, OBC not created")
+	}
+}
+
+func (r *ManagedMCGReconciler) setCachebucketClassDesiredState(object client.Object) *noobaav1alpha1.BucketClass {
+	r.Log.Info("Configure spec for Cache bucketClass", "name", object.GetName())
+	basebucketClass := object.(*noobaav1alpha1.BucketClass)
+	defaultBackingStore := r.getDefaultBackingStore()
+	if defaultBackingStore == "" {
+		return nil
+	}
+	var backingStoreName noobaav1alpha1.BackingStoreName = defaultBackingStore
+	backingStores := []noobaav1alpha1.BackingStoreName{backingStoreName}
+	tier := noobaav1alpha1.Tier{
+		BackingStores: backingStores,
+	}
+	bucketClass := &noobaav1alpha1.BucketClass{
+		Spec: noobaav1alpha1.BucketClassSpec{
+			NamespacePolicy: &noobaav1alpha1.NamespacePolicy{
+				Type: noobaav1alpha1.NSBucketClassTypeCache,
+				Cache: &noobaav1alpha1.CacheNamespacePolicy{
+					HubResource: basebucketClass.Spec.NamespacePolicy.Single.Resource,
+					Caching: &noobaav1alpha1.CacheSpec{
+						TTL: 3600000,
+					},
+				},
+			},
+			PlacementPolicy: &noobaav1alpha1.PlacementPolicy{
+				Tiers: []noobaav1alpha1.Tier{
+					tier,
+				},
+			},
+		},
+	}
+	return bucketClass
+}
+
+func (r *ManagedMCGReconciler) getDefaultBackingStore() string {
+	backingStores := noobaav1alpha1.BackingStoreList{}
+	if err := r.list(&backingStores); err != nil {
+		r.Log.Error(err, "error getting BackingStore list")
+		return ""
+	}
+	for _, backingStore := range backingStores.Items {
+		if strings.HasPrefix(backingStore.Name, DefaultBackingStore) {
+			return DefaultBackingStore
+		}
+	}
+	return backingStores.Items[0].Name
+}
+
+func (r *ManagedMCGReconciler) setOBCDesiredState(bucketName string, object client.Object) v1alpha1.ObjectBucketClaim {
+	AdditionalConfigMap := make(map[string]string)
+	AdditionalConfigMap["bucketclass"] = bucketName
+	obc := noobaav1alpha1.ObjectBucketClaim{
+		Spec: noobaav1alpha1.ObjectBucketClaimSpec{
+			BucketName:         bucketName,
+			StorageClassName:   r.namespace + ".noobaa.io",
+			GenerateBucketName: bucketName,
+			AdditionalConfig:   AdditionalConfigMap,
+		},
+	}
+	r.objectBucketClaim.Name = bucketName
+	annotations := object.GetAnnotations()
+	if obcNamespace, ok := annotations[McgmsObcNamespace]; ok {
+		r.objectBucketClaim.Namespace = obcNamespace
+	} else {
+		r.objectBucketClaim.Namespace = r.namespace
+	}
+	return obc
 }
 
 func (r *ManagedMCGReconciler) lookupImages() error {

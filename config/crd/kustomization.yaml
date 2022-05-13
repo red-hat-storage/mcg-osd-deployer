@@ -3,8 +3,6 @@
 # It should be run by config/default
 resources:
 - bases/mcg.openshift.io_managedmcgs.yaml
-- bases/objectbucket.objectbucket.io_managedmcgs.yaml
-- bases/objectbucketclaims.objectbucket.io_managedmcgs.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
