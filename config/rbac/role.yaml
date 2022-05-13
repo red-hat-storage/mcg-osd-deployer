@@ -119,9 +119,19 @@ rules:
 - apiGroups:
   - noobaa.io
   resources:
+  - backingstore
+  - backingstores
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - noobaa.io
+  resources:
   - bucketclass
   - bucketclasses
   verbs:
+  - create
   - get
   - list
   - watch

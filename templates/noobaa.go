@@ -26,18 +26,24 @@ import (
 
 // StorageClusterTemplate is the template that serves as the base for the storage clsuter deployed by the operator
 
-var AWSSTSARN = "arn:aws:iam::495507785675:role/STS-New"
 var NoobaaTemplate = &v1alpha1.NooBaa{
 
 	Spec: v1alpha1.NooBaaSpec{
-		DefaultBackingStoreSpec: &v1alpha1.BackingStoreSpec{
-			AWSS3: &v1alpha1.AWSS3Spec{
-				TargetBucket:  "noobaa-sts",
-				AWSSTSRoleARN: &AWSSTSARN,
-				Region:        "eu-west-1",
+		/*DefaultBackingStoreSpec: &v1alpha1.BackingStoreSpec{
+			PVPool: &v1alpha1.PVPoolSpec{
+				StorageClass: "redhat-data-federation.noobaa.io",
+				NumVolumes:   1,
+				VolumeResources: &corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("16Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("16Gi"),
+					},
+				},
 			},
-			Type: v1alpha1.StoreTypeAWSS3,
-		},
+			Type: v1alpha1.StoreTypePVPool,
+		},*/
 		Endpoints: &v1alpha1.EndpointsSpec{
 			MinCount: 1,
 			MaxCount: 2,
