@@ -21,6 +21,8 @@ import (
 	"os"
 	"testing"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -39,18 +41,19 @@ import (
 )
 
 const (
-	CUSTOMER_NOTIFICATION_HTML_PATH = "/tmp/customernotification.html"
+	CustomerNotificationHTMLPath = "/tmp/customernotification.html"
 )
 
 func newSchemeFake() *runtime.Scheme {
 	schemeFake := runtime.NewScheme()
-	clientgoscheme.AddToScheme(schemeFake)
-	mcgv1alpha1.AddToScheme(schemeFake)
-	noobaa.AddToScheme(schemeFake)
-	opv1a1.AddToScheme(schemeFake)
-	operatorv1.Install(schemeFake)
-	promv1.AddToScheme(schemeFake)
-	promv1a1.AddToScheme(schemeFake)
+	utilruntime.Must(clientgoscheme.AddToScheme(schemeFake))
+	utilruntime.Must(mcgv1alpha1.AddToScheme(schemeFake))
+	utilruntime.Must(noobaa.AddToScheme(schemeFake))
+	utilruntime.Must(opv1a1.AddToScheme(schemeFake))
+	utilruntime.Must(operatorv1.Install(schemeFake))
+	utilruntime.Must(promv1.AddToScheme(schemeFake))
+	utilruntime.Must(promv1a1.AddToScheme(schemeFake))
+
 	return schemeFake
 }
 
@@ -65,6 +68,7 @@ func newManagedMCGFake() mcgv1alpha1.ManagedMCG {
 			ReconcileStrategy: "ignore",
 		},
 	}
+
 	return managedMCGFake
 }
 
@@ -77,6 +81,7 @@ func newAddonSecretFake() corev1.Secret {
 	}
 	secretFake.Data = make(map[string][]byte, 1)
 	secretFake.Data["addonparam"] = []byte("foo")
+
 	return secretFake
 }
 
@@ -89,6 +94,7 @@ func newPagerDutySecretFake() corev1.Secret {
 	}
 	secretFake.Data = make(map[string][]byte, 1)
 	secretFake.Data["PAGERDUTY_KEY"] = []byte("foo")
+
 	return secretFake
 }
 
@@ -101,10 +107,11 @@ func newDeadMansSecretFake() corev1.Secret {
 	}
 	secretFake.Data = make(map[string][]byte, 1)
 	secretFake.Data["SNITCH_URL"] = []byte("foo")
+
 	return secretFake
 }
 
-func newSmtpSecretFake() corev1.Secret {
+func newSMTPSecretFake() corev1.Secret {
 	secretFake := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "SmtpSecretfake",
@@ -116,8 +123,10 @@ func newSmtpSecretFake() corev1.Secret {
 	secretFake.Data["port"] = []byte("8080")
 	secretFake.Data["username"] = []byte("username")
 	secretFake.Data["password"] = []byte("password")
+
 	return secretFake
 }
+
 func newOcsCsvFake() opv1a1.ClusterServiceVersion {
 	ocscsv := opv1a1.ClusterServiceVersion{
 		ObjectMeta: metav1.ObjectMeta{
@@ -125,11 +134,14 @@ func newOcsCsvFake() opv1a1.ClusterServiceVersion {
 			Namespace: "openshift-storage",
 		},
 	}
+
 	return ocscsv
 }
+
 func cleanup() {
-	os.Remove(CUSTOMER_NOTIFICATION_HTML_PATH)
+	os.Remove(CustomerNotificationHTMLPath)
 }
+
 func TestManagedMCGReconcilerReconcile(t *testing.T) {
 	r := &ManagedMCGReconciler{}
 	r.Log = ctrl.Log.WithName("controllers").WithName("ManagedMCGFake")
@@ -138,7 +150,7 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 	ocscsvFake := newOcsCsvFake()
 	managedMCGFake := newManagedMCGFake()
 	addonsecretFake := newAddonSecretFake()
-	smtpsecretfake := newSmtpSecretFake()
+	smtpsecretfake := newSMTPSecretFake()
 	pagerdutysecretFake := newPagerDutySecretFake()
 	deadmansercretFake := newDeadMansSecretFake()
 
@@ -146,10 +158,10 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 	r.DeadMansSnitchSecretName = "DeadMansSecretfake"
 	r.PagerdutySecretName = "PagerDutySecretfake"
 	r.SMTPSecretName = "SmtpSecretfake"
-	r.CustomerNotificationHTMLPath = CUSTOMER_NOTIFICATION_HTML_PATH
+	r.CustomerNotificationHTMLPath = CustomerNotificationHTMLPath
 
 	data := []byte{}
-	err := os.WriteFile(CUSTOMER_NOTIFICATION_HTML_PATH, data, 0444)
+	err := os.WriteFile(CustomerNotificationHTMLPath, data, 0o444)
 	if err != nil {
 		t.Errorf("Can not create file : %v", err)
 	}

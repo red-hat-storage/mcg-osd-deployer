@@ -36,16 +36,22 @@ ARCH = $(shell go env GOARCH)
 
 all: manager
 
+# Estimate coverage
+coverage: test
+	go tool cover -func coverage.out
+
 # Run linters
 lint:
-	hack/pre-commit-hooks.sh
+	hack/hooks/pre-commit
 
 # Run tests
 ENVTEST_ASSETS_DIR = $(shell pwd)/testbin
 test: generate fmt vet manifests
-	mkdir -p $(ENVTEST_ASSETS_DIR)
-	test -f $(ENVTEST_ASSETS_DIR)/setup-envtest.sh || curl -sSLo $(ENVTEST_ASSETS_DIR)/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.6.3/hack/setup-envtest.sh
-	source $(ENVTEST_ASSETS_DIR)/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); ACK_GINKGO_DEPRECATIONS=1.16.5 NOOBAA_CORE_IMAGE={NOOBAA_CORE_IMAGE} NOOBAA_DB_IMAGE={NOOBAA_DB_IMAGE} go test ./...
+	mkdir -p $(ENVTEST_ASSETS_DIR); \
+	test -f $(ENVTEST_ASSETS_DIR)/setup-envtest.sh || curl -sSLo $(ENVTEST_ASSETS_DIR)/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.6.3/hack/setup-envtest.sh; \
+	source $(ENVTEST_ASSETS_DIR)/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); \
+	go get golang.org/x/tools/cmd/cover; \
+ 	NOOBAA_CORE_IMAGE={NOOBAA_CORE_IMAGE} NOOBAA_DB_IMAGE={NOOBAA_DB_IMAGE} go test -v -coverprofile coverage.out ./...
 
 # Build manager binary
 manager: generate fmt vet
@@ -139,7 +145,6 @@ docker-build:
 docker-push:
 	docker push ${IMG}
 
-# find or download controller-gen
 # download controller-gen if necessary
 controller-gen:
 ifeq (, $(shell which controller-gen))
@@ -156,6 +161,7 @@ else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
 
+# download kustomize if necessary
 kustomize:
 ifeq (, $(shell which kustomize))
 	@{ \
@@ -170,6 +176,19 @@ KUSTOMIZE=$(GOBIN)/kustomize
 else
 KUSTOMIZE=$(shell which kustomize)
 endif
+
+# download etcd if necessary
+# requires root privileges
+etcd:
+	@{ \
+		if [[ ! -d "/usr/local/kubebuilder/bin" ]]; then \
+            curl -sSLo envtest-bins.tar.gz "https://go.kubebuilder.io/test-tools/1.21.2/linux/amd64" && \
+			mkdir /usr/local/kubebuilder && \
+            tar -C /usr/local/kubebuilder --strip-components=1 -zvxf envtest-bins.tar.gz && \
+            rm envtest-bins.tar.gz; \
+		fi \
+	}
+
 
 # Generate bundle manifests and metadata, then validate generated files.
 .PHONY: bundle
