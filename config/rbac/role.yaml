@@ -119,7 +119,6 @@ rules:
 - apiGroups:
   - noobaa.io
   resources:
-  - backingstore
   - backingstores
   verbs:
   - get
@@ -128,7 +127,6 @@ rules:
 - apiGroups:
   - noobaa.io
   resources:
-  - bucketclass
   - bucketclasses
   verbs:
   - create
@@ -149,7 +147,6 @@ rules:
 - apiGroups:
   - objectbucket.io
   resources:
-  - objectbucketclaim
   - objectbucketclaims
   verbs:
   - create

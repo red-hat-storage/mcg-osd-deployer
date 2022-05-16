@@ -123,9 +123,9 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 //+kubebuilder:rbac:groups="",namespace=system,resources=secrets,verbs=get;list;watch;create
 //+kubebuilder:rbac:groups="coordination.k8s.io",namespace=system,resources=leases,verbs=create;get;list;watch;update
 //+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=noobaas,verbs=get;list;watch;create;update;delete
-//+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources={bucketclass,bucketclasses},verbs=get;list;watch;create;
-//+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources={backingstore,backingstores},verbs=get;list;watch;
-//+kubebuilder:rbac:groups=objectbucket.io,namespace=system,resources={objectbucketclaim,objectbucketclaims},verbs=get;list;watch;create;
+//+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=bucketclasses,verbs=get;list;watch;create;
+//+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=backingstores,verbs=get;list;watch;
+//+kubebuilder:rbac:groups=objectbucket.io,namespace=system,resources=objectbucketclaims,verbs=get;list;watch;create;
 //+kubebuilder:rbac:groups=operators.coreos.com,namespace=system,resources=clusterserviceversions,verbs=get;list;watch;update;delete
 
 //+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources={alertmanagers,prometheuses,alertmanagerconfigs},verbs=get;list;watch;create;update
@@ -358,8 +358,6 @@ func (r *ManagedMCGReconciler) setNoobaaDesiredState(desiredNoobaa *noobaav1alph
 		AdditionalVirtualHosts: []string{},
 		Resources:              &endpointResources,
 	}
-	//awsSTSARN := r.addonParams["aws-sts-arn"]
-	//desiredNoobaa.Spec.DefaultBackingStoreSpec.AWSS3.AWSSTSRoleARN = &awsSTSARN
 }
 
 func (r *ManagedMCGReconciler) updateComponentStatus() {
@@ -521,9 +519,8 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 						return true
 					}
 					annotations := e.Object.GetAnnotations()
-					isCacheEnabled, ok := annotations[McgmsCacheEnabled]
-					r.Log.Info("Create OBC and cache bucketClass", "iscacheEnabled", isCacheEnabled, "ok", ok)
 					if isCacheEnabled, ok := annotations[McgmsCacheEnabled]; ok && isCacheEnabled == "true" {
+						r.Log.Info("Create cache bucketClass", "name", bucketName)
 						r.reconcileCachebucketClass(e.Object)
 					}
 				}
@@ -570,7 +567,7 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *ManagedMCGReconciler) reconcileCachebucketClass(object client.Object) {
 	r.Log.Info("Create Cache bucketClass for cache enabled namespacestores", "name", object.GetName())
-	bucketClass := r.setCachebucketClassDesiredState(object)
+	bucketClass := r.setCacheBucketClassDesiredState(object)
 	if bucketClass == nil {
 		r.Log.Info("No Cache bucketClass returned for Cache enabled Bucket", "name", bucketClass.Name)
 		return
@@ -586,7 +583,7 @@ func (r *ManagedMCGReconciler) reconcileCachebucketClass(object client.Object) {
 	}
 }
 
-func (r *ManagedMCGReconciler) setCachebucketClassDesiredState(object client.Object) *noobaav1alpha1.BucketClass {
+func (r *ManagedMCGReconciler) setCacheBucketClassDesiredState(object client.Object) *noobaav1alpha1.BucketClass {
 	r.Log.Info("Configure spec for Cache bucketClass", "name", object.GetName())
 	basebucketClass := object.(*noobaav1alpha1.BucketClass)
 	defaultBackingStore := r.getDefaultBackingStore()

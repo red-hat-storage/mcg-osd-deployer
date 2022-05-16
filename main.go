@@ -124,7 +124,6 @@ func main() {
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
-
 	if err := ensureManagedMCG(mgr.GetClient(), setupLog, envMap); err != nil {
 		os.Exit(1)
 	}
