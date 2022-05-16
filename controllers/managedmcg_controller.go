@@ -114,7 +114,6 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 	r.bucketClass = &noobaav1alpha1.BucketClass{}
 	r.bucketClass.Namespace = r.namespace
 	r.initializePrometheusReconciler()
-
 }
 
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources={managedmcgs,managedmcgs/finalizers},verbs=get;list;watch;create;update;patch;delete
@@ -246,6 +245,7 @@ func (r *ManagedMCGReconciler) updateAddonParams() error {
 	for key, value := range addonParamSecret.Data {
 		r.addonParams[key] = string(value)
 	}
+
 	return nil
 }
 
@@ -558,17 +558,44 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return nil
 }
 
+func (r *ManagedMCGReconciler) watchBucketClass(event event.CreateEvent) {
+	bucketName := event.Object.GetName()
+	annotations := event.Object.GetAnnotations()
+	if _, ok := annotations[McgmsObcNamespace]; ok {
+		r.objectBucketClaim = &noobaav1alpha1.ObjectBucketClaim{}
+		r.bucketClass = &noobaav1alpha1.BucketClass{}
+		r.ctx = context.Background()
+		r.Log.Info("Create OBC and cache bucketClass", "name", bucketName)
+		obc := r.setOBCDesiredState(bucketName, event.Object)
+		result, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.objectBucketClaim, func() error {
+			r.objectBucketClaim.Spec = obc.Spec
+
+			return nil
+		})
+		if err != nil || result == "unchanged" {
+			r.Log.Error(err, "Error while creating OBC, OBC not created")
+		}
+		annotations := event.Object.GetAnnotations()
+		if isCacheEnabled, ok := annotations[McgmsCacheEnabled]; ok && isCacheEnabled == "true" {
+			r.Log.Info("Create cache bucketClass", "name", bucketName)
+			r.reconcileCachebucketClass(event.Object)
+		}
+	}
+}
+
 func (r *ManagedMCGReconciler) reconcileCachebucketClass(object client.Object) {
 	r.Log.Info("Create Cache bucketClass for cache enabled namespacestores", "name", object.GetName())
 	bucketClass := r.setCacheBucketClassDesiredState(object)
 	if bucketClass == nil {
 		r.Log.Info("No Cache bucketClass returned for Cache enabled Bucket", "name", bucketClass.Name)
+
 		return
 	}
 	bucketClass.Name = object.GetName() + "-cache"
 	bucketClass.Namespace = r.namespace
 	result, err := ctrl.CreateOrUpdate(r.ctx, r.Client, bucketClass, func() error {
 		r.Log.Info("creating/updating bucketClass CR", "name", bucketClass.Name)
+
 		return nil
 	})
 	if err != nil || result == "unchanged" {
@@ -577,13 +604,16 @@ func (r *ManagedMCGReconciler) reconcileCachebucketClass(object client.Object) {
 }
 
 func (r *ManagedMCGReconciler) setCacheBucketClassDesiredState(object client.Object) *noobaav1alpha1.BucketClass {
-	r.Log.Info("Configure spec for Cache bucketClass", "name", object.GetName())
-	basebucketClass := object.(*noobaav1alpha1.BucketClass)
+	basebucketClass, ok := object.(*noobaav1alpha1.BucketClass)
+	if !ok {
+		return nil
+	}
+	r.Log.Info("Configure spec for Cache bucketClass", "name", basebucketClass.GetName())
 	defaultBackingStore := r.getDefaultBackingStore()
 	if defaultBackingStore == "" {
 		return nil
 	}
-	var backingStoreName noobaav1alpha1.BackingStoreName = defaultBackingStore
+	backingStoreName := defaultBackingStore
 	backingStores := []noobaav1alpha1.BackingStoreName{backingStoreName}
 	tier := noobaav1alpha1.Tier{
 		BackingStores: backingStores,
@@ -606,6 +636,7 @@ func (r *ManagedMCGReconciler) setCacheBucketClassDesiredState(object client.Obj
 			},
 		},
 	}
+
 	return bucketClass
 }
 
@@ -613,6 +644,7 @@ func (r *ManagedMCGReconciler) getDefaultBackingStore() string {
 	backingStores := noobaav1alpha1.BackingStoreList{}
 	if err := r.list(&backingStores); err != nil {
 		r.Log.Error(err, "error getting BackingStore list")
+
 		return ""
 	}
 	for _, backingStore := range backingStores.Items {
@@ -620,6 +652,7 @@ func (r *ManagedMCGReconciler) getDefaultBackingStore() string {
 			return DefaultBackingStore
 		}
 	}
+
 	return backingStores.Items[0].Name
 }
 
@@ -641,6 +674,7 @@ func (r *ManagedMCGReconciler) setOBCDesiredState(bucketName string, object clie
 	} else {
 		r.objectBucketClaim.Namespace = r.namespace
 	}
+
 	return obc
 }
 
