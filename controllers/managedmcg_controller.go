@@ -40,7 +40,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -358,8 +357,6 @@ func (r *ManagedMCGReconciler) setNoobaaDesiredState(desiredNoobaa *noobaav1alph
 		AdditionalVirtualHosts: []string{},
 		Resources:              &endpointResources,
 	}
-	//awsSTSARN := r.addonParams["aws-sts-arn"]
-	//desiredNoobaa.Spec.DefaultBackingStoreSpec.AWSS3.AWSSTSRoleARN = &awsSTSARN
 }
 
 func (r *ManagedMCGReconciler) updateComponentStatus() {
@@ -562,7 +559,7 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *ManagedMCGReconciler) reconcileCachebucketClass(object client.Object) {
 	r.Log.Info("Create Cache bucketClass for cache enabled namespacestores", "name", object.GetName())
-	bucketClass := r.setCachebucketClassDesiredState(object)
+	bucketClass := r.setCacheBucketClassDesiredState(object)
 	if bucketClass == nil {
 		r.Log.Info("No Cache bucketClass returned for Cache enabled Bucket", "name", bucketClass.Name)
 		return
@@ -578,7 +575,7 @@ func (r *ManagedMCGReconciler) reconcileCachebucketClass(object client.Object) {
 	}
 }
 
-func (r *ManagedMCGReconciler) setCachebucketClassDesiredState(object client.Object) *noobaav1alpha1.BucketClass {
+func (r *ManagedMCGReconciler) setCacheBucketClassDesiredState(object client.Object) *noobaav1alpha1.BucketClass {
 	r.Log.Info("Configure spec for Cache bucketClass", "name", object.GetName())
 	basebucketClass := object.(*noobaav1alpha1.BucketClass)
 	defaultBackingStore := r.getDefaultBackingStore()
