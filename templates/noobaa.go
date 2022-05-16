@@ -27,7 +27,6 @@ import (
 // NoobaaTemplate is the template that serves as the base for the storage clsuter deployed by the operator
 
 var NoobaaTemplate = &v1alpha1.NooBaa{
-
 	Spec: v1alpha1.NooBaaSpec{
 		Endpoints: &v1alpha1.EndpointsSpec{
 			MinCount: 1,
