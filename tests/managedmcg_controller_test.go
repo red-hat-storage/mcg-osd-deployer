@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"os"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -9,17 +10,20 @@ import (
 	"github.com/red-hat-storage/mcg-osd-deployer/controllers"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	noobaav1alpha1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
-	"k8s.io/apimachinery/pkg/types"
+	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	promv1a1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 const (
-	namespace = "redhat-data-federation"
+	namespace                    = "redhat-data-federation"
+	customerNotificationHTMLPath = "/tmp/customernotification.html"
 )
 
 var (
@@ -28,38 +32,38 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      managedMCGName,
 			Namespace: namespace,
+			UID:       "123456",
 		},
 		Spec: managedmcgv1alpha1.ManagedMCGSpec{
 			ReconcileStrategy: "ignore",
 		},
 	}
+	namespaceFake = &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+		},
+	}
+	r = &controllers.ManagedMCGReconciler{
+		Log: ctrl.Log.WithName("controllers").WithName("managedmcg"),
+	}
 )
 
 var _ = Describe("ManagedMCG validations", func() {
-	When("Creating and deleting ManagedMCG", func() {
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: namespace,
-			},
-		}
+	BeforeEach(func() {
+		r.Scheme = k8sClient.Scheme()
+	})
 
-		BeforeEach(func() {
-			err := k8sClient.Create(context.Background(), ns, &client.CreateOptions{})
-			Expect(err).NotTo(HaveOccurred())
-		})
-		AfterEach(func() {
-			err := k8sClient.Delete(context.Background(), ns, &client.DeleteOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			Eventually(func() bool {
-				return k8sClient.Get(context.Background(), types.NamespacedName{}, ns) != nil
-			}, "30s").Should(BeFalse())
-		})
+	When("Creating and deleting ManagedMCG", func() {
 		It("should not return validation error", func() {
 			By("using default values", func() {
+				newNamespace := namespaceFake.DeepCopy()
 				newManagedMCG := managedMCG.DeepCopy()
-				err := k8sClient.Create(context.Background(), newManagedMCG, &client.CreateOptions{})
+				r.Client = fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(newNamespace, newManagedMCG).Build()
+
+				err := r.Client.Delete(context.Background(), newManagedMCG, &client.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
-				err = k8sClient.Delete(context.Background(), newManagedMCG, &client.DeleteOptions{})
+
+				err = r.Client.Delete(context.Background(), newNamespace, &client.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -68,50 +72,48 @@ var _ = Describe("ManagedMCG validations", func() {
 
 var _ = Describe("ManagedMCGReconciler Reconcile", func() {
 	When("Creating ManagedMCG", func() {
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: namespace,
-			},
-		}
-
 		addonSecretFake := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "addon-secret-fake",
 				Namespace: namespace,
 			},
+			Data: map[string][]byte{
+				"addonparam": []byte("foo"),
+			},
 		}
-		addonSecretFake.Data = make(map[string][]byte, 1)
-		addonSecretFake.Data["addonparam"] = []byte("foo")
 
 		pagerDutySecretFake := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pagerduty-secret-fake",
 				Namespace: namespace,
 			},
+			Data: map[string][]byte{
+				"PAGERDUTY_KEY": []byte("foo"),
+			},
 		}
-		pagerDutySecretFake.Data = make(map[string][]byte, 1)
-		pagerDutySecretFake.Data["PAGERDUTY_KEY"] = []byte("foo")
 
 		deadMansSecretfake := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "deadmans-secret-fake",
 				Namespace: namespace,
 			},
+			Data: map[string][]byte{
+				"SNITCH_URL": []byte("foo"),
+			},
 		}
-		deadMansSecretfake.Data = make(map[string][]byte, 1)
-		deadMansSecretfake.Data["SNITCH_URL"] = []byte("foo")
 
 		smtpSecretFake := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "smtp-secret-fake",
 				Namespace: namespace,
 			},
+			Data: map[string][]byte{
+				"host":     []byte("host"),
+				"port":     []byte("8080"),
+				"username": []byte("username"),
+				"password": []byte("password"),
+			},
 		}
-		smtpSecretFake.Data = make(map[string][]byte, 1)
-		smtpSecretFake.Data["host"] = []byte("host")
-		smtpSecretFake.Data["port"] = []byte("8080")
-		smtpSecretFake.Data["username"] = []byte("username")
-		smtpSecretFake.Data["password"] = []byte("password")
 
 		ocscsv := opv1a1.ClusterServiceVersion{
 			ObjectMeta: metav1.ObjectMeta{
@@ -127,45 +129,102 @@ var _ = Describe("ManagedMCGReconciler Reconcile", func() {
 			},
 		}
 
-		BeforeEach(func() {
-			err := k8sClient.Create(context.Background(), ns, &client.CreateOptions{})
-			Expect(err).NotTo(HaveOccurred())
+		prometheusFake := promv1.Prometheus{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "prometheus-fake",
+				Namespace: namespace,
+			},
+		}
 
-			newManagedMCG := managedMCG.DeepCopy()
-			err = k8sClient.Create(context.Background(), newManagedMCG, &client.CreateOptions{})
+		alertmanagerFake := promv1.Alertmanager{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "alertmanager-fake",
+				Namespace: namespace,
+			},
+		}
+
+		alertmanagerConfigFake := promv1a1.AlertmanagerConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "alertmanager-fake",
+				Namespace: namespace,
+			},
+		}
+
+		alertRelabelConfigSecretFake := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "alertmanager-config-fake",
+				Namespace: namespace,
+			},
+		}
+
+		dmsRuleFake := promv1.PrometheusRule{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "dms-rule-fake",
+				Namespace: namespace,
+			},
+		}
+
+		newNamespace := namespaceFake.DeepCopy()
+		newManagedMCG := managedMCG.DeepCopy()
+		newOcscsv := ocscsv.DeepCopy()
+		newAddonSecret := addonSecretFake.DeepCopy()
+		newSMTPSecret := smtpSecretFake.DeepCopy()
+		newDeadMansSecret := deadMansSecretfake.DeepCopy()
+		newPagerDutySecret := pagerDutySecretFake.DeepCopy()
+		newNoobacsv := noobacsv.DeepCopy()
+		newPrometheus := prometheusFake.DeepCopy()
+		newAlertManager := alertmanagerFake.DeepCopy()
+		newAlertManagerConfig := alertmanagerConfigFake.DeepCopy()
+		newAlertRelabelConfigSecret := alertRelabelConfigSecretFake.DeepCopy()
+		newDMSRule := dmsRuleFake.DeepCopy()
+
+		BeforeEach(func() {
+			r.Scheme = k8sClient.Scheme()
+			r.Client = fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(newNamespace, newManagedMCG, newOcscsv,
+				newAddonSecret, newSMTPSecret, newDeadMansSecret, newPagerDutySecret, newNoobacsv, newPrometheus,
+				newAlertManager, newAlertManagerConfig, newAlertRelabelConfigSecret, newDMSRule).Build()
+			r.AddonParamSecretName = newAddonSecret.Name
+			r.PagerdutySecretName = newPagerDutySecret.Name
+			r.DeadMansSnitchSecretName = newDeadMansSecret.Name
+			r.SMTPSecretName = newSMTPSecret.Name
+
+			r.CustomerNotificationHTMLPath = customerNotificationHTMLPath
+
+			err := os.WriteFile(customerNotificationHTMLPath, []byte{}, 0o444)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		AfterEach(func() {
-			newManagedMCG := managedMCG.DeepCopy()
-			err := k8sClient.Delete(context.Background(), newManagedMCG, &client.DeleteOptions{})
+			err := r.Client.Delete(context.Background(), newOcscsv, &client.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
-			// err = fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).Build().Delete(context.Background(), &ocscsv, &client.DeleteOptions{})
-			// Expect(err).NotTo(HaveOccurred())
-
-			err = fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).Build().DeleteAllOf(context.Background(), &corev1.Secret{}, &client.DeleteAllOfOptions{
-				ListOptions: client.ListOptions{
-					Namespace: namespace,
-				},
-			})
+			err = r.Client.Delete(context.Background(), newAddonSecret, &client.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
-			// err = fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).Build().Delete(context.Background(), &noobaacsv, &client.DeleteOptions{})
-			// Expect(err).NotTo(HaveOccurred())
+			err = r.Client.Delete(context.Background(), newSMTPSecret, &client.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
 
-			err = k8sClient.Delete(context.Background(), ns, &client.DeleteOptions{})
+			err = r.Client.Delete(context.Background(), newDeadMansSecret, &client.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = r.Client.Delete(context.Background(), newPagerDutySecret, &client.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = r.Client.Delete(context.Background(), newNoobacsv, &client.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = r.Client.Delete(context.Background(), newManagedMCG, &client.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = r.Client.Delete(context.Background(), newNamespace, &client.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = os.Remove(customerNotificationHTMLPath)
 			Expect(err).NotTo(HaveOccurred())
 		})
+
 		It("should be able to reconcile ManagedMCG object", func() {
 			By("providing valid ManagedMCG params", func() {
-
-				r := &controllers.ManagedMCGReconciler{
-					Scheme: k8sClient.Scheme(),
-					Log:    ctrl.Log.WithName("controllers").WithName("ManagedMCGFake"),
-					Client: fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(&ocscsv, &smtpSecretFake, &addonSecretFake, &deadMansSecretfake, &pagerDutySecretFake, &noobacsv).Build(),
-				}
-
 				req := ctrl.Request{
 					NamespacedName: types.NamespacedName{
 						Name:      "managedmcg",
