@@ -24,26 +24,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-// StorageClusterTemplate is the template that serves as the base for the storage clsuter deployed by the operator
+// NoobaaTemplate is the template that serves as the base for the storage clsuter deployed by the operator
 
 var NoobaaTemplate = &v1alpha1.NooBaa{
 
 	Spec: v1alpha1.NooBaaSpec{
-		/*DefaultBackingStoreSpec: &v1alpha1.BackingStoreSpec{
-			PVPool: &v1alpha1.PVPoolSpec{
-				StorageClass: "redhat-data-federation.noobaa.io",
-				NumVolumes:   1,
-				VolumeResources: &corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceStorage: resource.MustParse("16Gi"),
-					},
-					Limits: corev1.ResourceList{
-						corev1.ResourceStorage: resource.MustParse("16Gi"),
-					},
-				},
-			},
-			Type: v1alpha1.StoreTypePVPool,
-		},*/
 		Endpoints: &v1alpha1.EndpointsSpec{
 			MinCount: 1,
 			MaxCount: 2,
