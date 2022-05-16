@@ -1,3 +1,5 @@
+MAKEFILE := $(lastword $(MAKEFILE_LIST))
+
 include shim/.env
 
 # Current Operator version
@@ -37,7 +39,7 @@ ARCH = $(shell go env GOARCH)
 all: manager
 
 # Estimate coverage
-coverage: test
+coverage:
 	go tool cover -func coverage.out
 
 # Run linters
@@ -46,12 +48,25 @@ lint:
 
 # Run tests
 ENVTEST_ASSETS_DIR = $(shell pwd)/testbin
-test: generate fmt vet manifests
+setup-envtest:
 	mkdir -p $(ENVTEST_ASSETS_DIR); \
-	test -f $(ENVTEST_ASSETS_DIR)/setup-envtest.sh || curl -sSLo $(ENVTEST_ASSETS_DIR)/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.6.3/hack/setup-envtest.sh; \
-	source $(ENVTEST_ASSETS_DIR)/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); \
+    test -f $(ENVTEST_ASSETS_DIR)/setup-envtest.sh || curl -sSLo $(ENVTEST_ASSETS_DIR)/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.6.3/hack/setup-envtest.sh; \
+    source $(ENVTEST_ASSETS_DIR)/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR)
+
+test: generate fmt vet manifests setup-envtest
 	go get golang.org/x/tools/cmd/cover; \
- 	NOOBAA_CORE_IMAGE={NOOBAA_CORE_IMAGE} NOOBAA_DB_IMAGE={NOOBAA_DB_IMAGE} go test -v -coverprofile coverage.out ./...
+ 	NOOBAA_CORE_IMAGE={NOOBAA_CORE_IMAGE} NOOBAA_DB_IMAGE={NOOBAA_DB_IMAGE} go test -v -coverprofile coverage.out ./...; \
+	$(MAKE) -f $(MAKEFILE) coverage
+
+unit-test: generate fmt vet manifests
+	go get golang.org/x/tools/cmd/cover; \
+	NOOBAA_CORE_IMAGE={NOOBAA_CORE_IMAGE} NOOBAA_DB_IMAGE={NOOBAA_DB_IMAGE} go test -v -coverprofile coverage.out ./controllers; \
+	$(MAKE) -f $(MAKEFILE) coverage
+
+e2e-test: generate fmt vet manifests setup-envtest
+	go get golang.org/x/tools/cmd/cover; \
+ 	NOOBAA_CORE_IMAGE={NOOBAA_CORE_IMAGE} NOOBAA_DB_IMAGE={NOOBAA_DB_IMAGE} go test -v -coverprofile coverage.out ./tests; \
+	$(MAKE) -f $(MAKEFILE) coverage
 
 # Build manager binary
 manager: generate fmt vet
