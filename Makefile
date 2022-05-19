@@ -162,7 +162,14 @@ docker-push:
 
 # download controller-gen if necessary
 controller-gen:
-ifeq (, $(shell which controller-gen))
+ifeq ($(origin PULL_NUMBER),undefined)
+	# [setting up controller-gen for local usage]
+	@ { \
+	GO111MODULES=off go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.4.1 ;\
+	}
+CONTROLLER_GEN=$(shell which controller-gen)
+else
+	# [setting up controller-gen for CI usage]
 	@{ \
 	set -e ;\
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
@@ -172,8 +179,6 @@ ifeq (, $(shell which controller-gen))
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONTROLLER_GEN=$(GOBIN)/controller-gen
-else
-CONTROLLER_GEN=$(shell which controller-gen)
 endif
 
 # download kustomize if necessary
