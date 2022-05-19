@@ -19,16 +19,16 @@ package templates
 import (
 	//
 	_ "github.com/go-openapi/spec"
-	"github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
+	noobaa "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // NoobaaTemplate is the template that serves as the base for the storage clsuter deployed by the operator
 
-var NoobaaTemplate = &v1alpha1.NooBaa{
-	Spec: v1alpha1.NooBaaSpec{
-		Endpoints: &v1alpha1.EndpointsSpec{
+var NoobaaTemplate = &noobaa.NooBaa{
+	Spec: noobaa.NooBaaSpec{
+		Endpoints: &noobaa.EndpointsSpec{
 			MinCount: 1,
 			MaxCount: 2,
 			Resources: &v1.ResourceRequirements{
