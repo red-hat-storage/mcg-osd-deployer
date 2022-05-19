@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-const MAIN_BASE_PATH = "/"
-const COMPATIBILITY_BASE_PATH = "/compatibility/"
+const mainBasePath = "/"
+const compatibilityBasePath = "/compatibility/"
 
 func GetDeployment(namespace string) *appsv1.Deployment {
 	return &appsv1.Deployment{
@@ -44,8 +44,7 @@ func GetService(port int, namespace string) *apiv1.Service {
 			Name:      "mcg-ms-console-service",
 			Namespace: namespace,
 			Annotations: map[string]string{
-				//TODO: Replace "addon-mcg-osd-parameters" with appr. secret
-				"service.alpha.openshift.io/serving-cert-secret-name": "addon-mcg-osd-parameters",
+				"service.alpha.openshift.io/serving-cert-secret-name": "mcg-ms-console-serving-cert",
 			},
 			Labels: map[string]string{
 				"app": "mcg-ms-console",
@@ -73,7 +72,7 @@ func GetConsolePluginCR(consolePort int, basePath string, serviceNamespace strin
 			Name: "mcg-ms-console",
 		},
 		Spec: consolev1alpha1.ConsolePluginSpec{
-			DisplayName: "mcg Plugin",
+			DisplayName: "mcg-managed-service-console plugin",
 			Service: consolev1alpha1.ConsolePluginService{
 				Name:      "mcg-ms-console-service",
 				Namespace: serviceNamespace,
@@ -86,8 +85,8 @@ func GetConsolePluginCR(consolePort int, basePath string, serviceNamespace strin
 
 func GetBasePath(clusterVersion string) string {
 	if strings.Contains(clusterVersion, "4.11") {
-		return COMPATIBILITY_BASE_PATH
+		return compatibilityBasePath
 	}
 
-	return MAIN_BASE_PATH
+	return mainBasePath
 }

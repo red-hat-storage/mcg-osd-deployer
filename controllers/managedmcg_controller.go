@@ -24,7 +24,6 @@ import (
 
 	"github.com/go-logr/logr"
 	noobaav1alpha1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
-	configv1 "github.com/openshift/api/config/v1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	promv1a1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
@@ -43,7 +42,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -56,6 +54,7 @@ const (
 	deployerCSVPrefix = "mcg-osd-deployer"
 	noobaaFinalizer   = "noobaa.io/graceful_finalizer"
 	noobaaName        = "noobaa"
+	clusterVersion    = "4.10"
 )
 
 type ImageMap struct {
@@ -132,10 +131,17 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 //+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources=podmonitors,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources=servicemonitors,verbs=get;list;watch;update;patch;create
 //+kubebuilder:rbac:groups="apps",namespace=system,resources=statefulsets,verbs=get;list;watch
+//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions/finalizers,verbs=update
+//+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="apps",resources=deployments/finalizers,verbs=update
+
+//+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=console.openshift.io,resources=consoleplugins,verbs=*
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-func (r *ManagedMCGReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ManagedMCGReconciler) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("req.Namespace", req.Namespace, "req.Name", req.Name)
 	log.Info("starting reconciliation for ManagedMCG")
 	r.initializeReconciler(req)
@@ -146,7 +152,7 @@ func (r *ManagedMCGReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, err
 		}
 	}
-	result, err := r.reconcilePhases(ctx, req)
+	result, err := r.reconcilePhases()
 	if err != nil {
 		r.Log.Error(err, "error reconciling ManagedMCG")
 	}
@@ -166,7 +172,7 @@ func (r *ManagedMCGReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 }
 
-func (r *ManagedMCGReconciler) reconcilePhases(ctx context.Context, req ctrl.Request) (reconcile.Result, error) {
+func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 	r.Log.Info("reconciliation phases initiated")
 	foundAddonDeletionKey := r.verifyAddonDeletionKey()
 	r.updateComponentStatus()
@@ -205,20 +211,15 @@ func (r *ManagedMCGReconciler) reconcilePhases(ctx context.Context, req ctrl.Req
 		if err := r.reconcileAlertMonitoring(); err != nil {
 			return ctrl.Result{}, err
 		}
+
 		if err := r.reconcileOCSCSV(); err != nil {
 			return ctrl.Result{}, err
 		}
 
-		logger := log.FromContext(ctx)
-		instance := configv1.ClusterVersion{}
-		if err := r.Client.Get(context.TODO(), req.NamespacedName, &instance); err != nil {
+		if err := r.ensureConsolePlugin(clusterVersion); err != nil {
 			return ctrl.Result{}, err
 		}
 
-		if err := r.ensureConsolePlugin(instance.Status.Desired.Version); err != nil {
-			logger.Error(err, "Could not ensure compatibility for MCG consolePlugin")
-			return ctrl.Result{}, err
-		}
 		r.managedMCG.Status.ReconcileStrategy = r.reconcileStrategy
 		if foundAddonDeletionKey && r.areComponentsReadyForUninstall() {
 			r.Log.Info("commencing addon deletion Components in ready state", "addon deletion key", foundAddonDeletionKey)
@@ -651,35 +652,40 @@ func (r *ManagedMCGReconciler) getCSVByPrefix(name string) (*opv1a1.ClusterServi
 }
 
 func (r *ManagedMCGReconciler) ensureConsolePlugin(clusterVersion string) error {
-	// The base path to where the request are sent
+	// The base path to where the plugin's assets are stored. ex: plugin-manifest.json
 	basePath := console.GetBasePath(clusterVersion)
 
 	// Get mcg console Deployment
 	mcgConsoleDeployment := console.GetDeployment(r.namespace)
-	err := r.Client.Get(context.TODO(), types.NamespacedName{
+	err := r.Client.Get(r.ctx, types.NamespacedName{
 		Name:      mcgConsoleDeployment.Name,
 		Namespace: mcgConsoleDeployment.Namespace,
 	}, mcgConsoleDeployment)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get the deployment, %w", err)
 	}
 
 	// Create/Update mcg console Service
 	mcgConsoleService := console.GetService(r.ConsolePort, r.namespace)
-	_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, mcgConsoleService, func() error {
-		return controllerutil.SetControllerReference(mcgConsoleDeployment, mcgConsoleService, r.Scheme)
+	_, err = controllerutil.CreateOrUpdate(r.ctx, r.Client, mcgConsoleService, func() error {
+		err = controllerutil.SetControllerReference(mcgConsoleDeployment, mcgConsoleService, r.Scheme)
+		if err != nil {
+			return fmt.Errorf("failed to set controller owner reference, %w", err)
+		}
+
+		return nil
 	})
 	if err != nil && !errors.IsAlreadyExists(err) {
-		return err
+		return fmt.Errorf("failed to create/update console service, %w", err)
 	}
 
 	// Create/Update mcg console ConsolePlugin
 	mcgConsolePlugin := console.GetConsolePluginCR(r.ConsolePort, basePath, r.namespace)
-	_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, mcgConsolePlugin, func() error {
+	_, err = controllerutil.CreateOrUpdate(r.ctx, r.Client, mcgConsolePlugin, func() error {
 		return nil
 	})
 	if err != nil && !errors.IsAlreadyExists(err) {
-		return err
+		return fmt.Errorf("failed to get console plugin CR, %w", err)
 	}
 
 	return nil
