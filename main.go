@@ -46,7 +46,11 @@ import (
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	promv1a1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	mcgv1alpha1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
+
 	//+kubebuilder:scaffold:imports
+
+	consolev1 "github.com/openshift/api/console/v1"
+	consolev1alpha1 "github.com/openshift/api/console/v1alpha1"
 )
 
 var (
@@ -72,6 +76,10 @@ func init() {
 	utilruntime.Must(noobaav1alpha1.SchemeBuilder.AddToScheme(scheme))
 	utilruntime.Must(obv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
+
+	utilruntime.Must(consolev1.AddToScheme(scheme))
+	utilruntime.Must(consolev1alpha1.AddToScheme(scheme))
+
 }
 
 func main() {
@@ -117,6 +125,7 @@ func main() {
 		DeadMansSnitchSecretName:     fmt.Sprintf("%v-deadmanssnitch", addonName),
 		SMTPSecretName:               fmt.Sprintf("%v-smtp", addonName),
 		SOPEndpoint:                  envMap[sopEndpointKey],
+		ConsolePort:                  9002,
 		AlertSMTPFrom:                envMap[alertSMTPFromAddrKey],
 		CustomerNotificationHTMLPath: "templates/customernotification.html",
 	}).SetupWithManager(mgr); err != nil {

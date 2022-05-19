@@ -22,7 +22,7 @@ spec:
             - containerPort: 9002
               protocol: TCP
           volumeMounts:
-            - name: addon-mcg-osd-parameters
+            - name: mcg-ms-console-serving-cert
               mountPath: /var/serving-cert
               readOnly: true
       tolerations:
@@ -31,6 +31,6 @@ spec:
         operator: Equal
         value: "true"
       volumes:
-        - name: addon-mcg-osd-parameters
+        - name: mcg-ms-console-serving-cert
           secret:
-            secretName: addon-mcg-osd-parameters
+            secretName: mcg-ms-console-serving-cert
