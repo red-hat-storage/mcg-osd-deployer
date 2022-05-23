@@ -88,6 +88,8 @@ type ManagedMCGReconciler struct {
 	alertmanager             *promv1.Alertmanager
 	PagerdutySecretName      string
 	dmsRule                  *promv1.PrometheusRule
+	objectBucketClaim        *noobaav1alpha1.ObjectBucketClaim
+	bucketClass              *noobaav1alpha1.BucketClass
 }
 
 func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
@@ -102,6 +104,10 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 	r.noobaa = &noobaav1alpha1.NooBaa{}
 	r.noobaa.Name = noobaaName
 	r.noobaa.Namespace = r.namespace
+
+	r.objectBucketClaim = &noobaav1alpha1.ObjectBucketClaim{}
+	r.bucketClass = &noobaav1alpha1.BucketClass{}
+	r.bucketClass.Namespace = r.namespace
 	r.initializePrometheusReconciler()
 }
 
@@ -111,6 +117,9 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 //+kubebuilder:rbac:groups="",namespace=system,resources=secrets,verbs=get;list;watch;create
 //+kubebuilder:rbac:groups="coordination.k8s.io",namespace=system,resources=leases,verbs=create;get;list;watch;update
 //+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=noobaas,verbs=get;list;watch;create;update;delete
+//+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=bucketclasses,verbs=get;list;watch;create;
+//+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=backingstores,verbs=get;list;watch;
+//+kubebuilder:rbac:groups=objectbucket.io,resources=objectbucketclaims,verbs=get;list;watch;create;
 //+kubebuilder:rbac:groups=operators.coreos.com,namespace=system,resources=clusterserviceversions,verbs=get;list;watch;update;delete
 
 //+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources={alertmanagers,prometheuses,alertmanagerconfigs},verbs=get;list;watch;create;update
@@ -435,6 +444,20 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			}}
 		},
 	)
+
+	enqueueBucketClassRequest := handler.EnqueueRequestsFromMapFunc(
+		func(object client.Object) []reconcile.Request {
+			r.watchBucketClass(object)
+
+			return []reconcile.Request{{
+				NamespacedName: types.NamespacedName{
+					Name:      ManagedMCGName,
+					Namespace: object.GetNamespace(),
+				},
+			}}
+		},
+	)
+
 	configMapPredicates := builder.WithPredicates(
 		predicate.NewPredicateFuncs(
 			func(client client.Object) bool {
@@ -483,6 +506,17 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		),
 	)
 
+	bucketclassPredicates := builder.WithPredicates(
+		predicate.NewPredicateFuncs(
+			func(object client.Object) bool {
+				annotations := object.GetAnnotations()
+				_, ok := annotations[McgmsObcNamespace]
+
+				return ok
+			},
+		),
+	)
+
 	err := ctrl.NewControllerManagedBy(mgr).
 		For(&mcgv1alpha1.ManagedMCG{}, managedMCGPredicates).
 		// Watch non-owned resources
@@ -505,6 +539,11 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&source.Kind{Type: &promv1.PrometheusRule{}},
 			enqueueManagedMCGRequest,
 			prometheusRulesPredicates,
+		).
+		Watches(
+			&source.Kind{Type: &noobaav1alpha1.BucketClass{}},
+			enqueueBucketClassRequest,
+			bucketclassPredicates,
 		).
 		Complete(r)
 	if err != nil {

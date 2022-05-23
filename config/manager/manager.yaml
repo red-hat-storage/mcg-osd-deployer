@@ -72,8 +72,8 @@ spec:
             - name: ADDON_NAME
               value: mcg-osd
             - name: NOOBAA_CORE_IMAGE
-              value: quay.io/noobaa/noobaa-core:5.9-20220206
+              value: registry.redhat.io/odf4/mcg-core-rhel8@sha256:4ff2d65ea16dd1026fe278a0f8ca920f300dfcee205b4b8ede0ab28be1aa43a6
             - name: NOOBAA_DB_IMAGE
-              value: quay.io/centos7/postgresql-12-centos7:centos7
+              value: registry.redhat.io/rhel8/postgresql-12@sha256:be7212e938d1ef314a75aca070c28b6433cd0346704d0d3523c8ef403ff0c69e
       terminationGracePeriodSeconds: 10
       serviceAccountName: deployer

@@ -27,6 +27,15 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - objectbucket.io
+  resources:
+  - objectbucketclaims
+  verbs:
+  - create
+  - get
+  - list
+  - watch
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -115,6 +124,23 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - noobaa.io
+  resources:
+  - backingstores
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - noobaa.io
+  resources:
+  - bucketclasses
+  verbs:
+  - create
+  - get
+  - list
   - watch
 - apiGroups:
   - noobaa.io
