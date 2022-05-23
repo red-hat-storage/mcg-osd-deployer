@@ -26,7 +26,7 @@ import (
 
 // NoobaaTemplate is the template that serves as the base for the storage clsuter deployed by the operator
 
-var NoobaaTemplate = &v1alpha1.NooBaa{
+var NoobaaTemplate = &noobaa.NooBaa{
 
 	Spec: noobaa.NooBaaSpec{
 		DefaultBackingStoreSpec: &noobaa.BackingStoreSpec{
@@ -44,7 +44,7 @@ var NoobaaTemplate = &v1alpha1.NooBaa{
 			},
 			Type: noobaa.StoreTypePVPool,
 		},
-		Endpoints: &v1alpha1.EndpointsSpec{
+		Endpoints: &noobaa.EndpointsSpec{
 			MinCount: 1,
 			MaxCount: 2,
 			Resources: &v1.ResourceRequirements{
