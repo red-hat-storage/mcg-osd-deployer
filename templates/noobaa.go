@@ -19,9 +19,7 @@ package templates
 import (
 	//
 	_ "github.com/go-openapi/spec"
-	"github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	noobaa "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -30,20 +28,20 @@ import (
 
 var NoobaaTemplate = &noobaa.NooBaa{
 	Spec: noobaa.NooBaaSpec{
-		DefaultBackingStoreSpec: &v1alpha1.BackingStoreSpec{
-			PVPool: &v1alpha1.PVPoolSpec{
+		DefaultBackingStoreSpec: &noobaa.BackingStoreSpec{
+			PVPool: &noobaa.PVPoolSpec{
 				StorageClass: "gp2",
 				NumVolumes:   1,
-				VolumeResources: &corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceStorage: resource.MustParse("16Gi"),
+				VolumeResources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("16Gi"),
 					},
-					Limits: corev1.ResourceList{
-						corev1.ResourceStorage: resource.MustParse("16Gi"),
+					Limits: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("16Gi"),
 					},
 				},
 			},
-			Type: v1alpha1.StoreTypePVPool,
+			Type: noobaa.StoreTypePVPool,
 		},
 		Endpoints: &noobaa.EndpointsSpec{
 			MinCount: 1,
