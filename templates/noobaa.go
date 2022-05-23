@@ -28,6 +28,21 @@ import (
 
 var NoobaaTemplate = &noobaa.NooBaa{
 	Spec: noobaa.NooBaaSpec{
+		DefaultBackingStoreSpec: &noobaa.BackingStoreSpec{
+			PVPool: &noobaa.PVPoolSpec{
+				StorageClass: "gp2",
+				NumVolumes:   1,
+				VolumeResources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("16Gi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("16Gi"),
+					},
+				},
+			},
+			Type: noobaa.StoreTypePVPool,
+		},
 		Endpoints: &noobaa.EndpointsSpec{
 			MinCount: 1,
 			MaxCount: 2,
