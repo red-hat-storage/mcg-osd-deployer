@@ -27,7 +27,6 @@ import (
 // NoobaaTemplate is the template that serves as the base for the storage clsuter deployed by the operator
 
 var NoobaaTemplate = &noobaa.NooBaa{
-
 	Spec: noobaa.NooBaaSpec{
 		DefaultBackingStoreSpec: &noobaa.BackingStoreSpec{
 			PVPool: &noobaa.PVPoolSpec{
