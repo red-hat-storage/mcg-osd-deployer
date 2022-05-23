@@ -70,6 +70,10 @@ spec:
                 description: StorageClass names the StorageClass object representing
                   the desired provisioner and parameters
                 type: string
+              storageTest:
+                description: StorageClass names the StorageClass object representing
+                  the desired provisioner and parameters
+                type: string
             required:
             - storageClassName
             type: object
