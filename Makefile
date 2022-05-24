@@ -47,15 +47,17 @@ lint:
 	hack/hooks/pre-commit
 
 # Run tests
-ENVTEST_ASSETS_DIR = $(shell pwd)/testbin
+ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
 setup-envtest:
 	mkdir -p $(ENVTEST_ASSETS_DIR); \
-    test -f $(ENVTEST_ASSETS_DIR)/setup-envtest.sh || curl -sSLo $(ENVTEST_ASSETS_DIR)/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.6.3/hack/setup-envtest.sh; \
-    source $(ENVTEST_ASSETS_DIR)/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR)
+	test -f $(ENVTEST_ASSETS_DIR)/setup-envtest.sh || curl -sSLo $(ENVTEST_ASSETS_DIR)/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.6.3/hack/setup-envtest.sh; \
+	source $(ENVTEST_ASSETS_DIR)/setup-envtest.sh; \
+	fetch_envtest_tools $(ENVTEST_ASSETS_DIR); \
+	setup_envtest_env $(ENVTEST_ASSETS_DIR)
 
 test: generate fmt vet manifests setup-envtest
 	go get golang.org/x/tools/cmd/cover; \
- 	NOOBAA_CORE_IMAGE={NOOBAA_CORE_IMAGE} NOOBAA_DB_IMAGE={NOOBAA_DB_IMAGE} go test -v -coverprofile coverage.out ./...; \
+ 	KUBEBUILDER_ASSETS=$(ENVTEST_ASSETS_DIR)/bin NOOBAA_CORE_IMAGE={NOOBAA_CORE_IMAGE} NOOBAA_DB_IMAGE={NOOBAA_DB_IMAGE} go test -v -coverprofile coverage.out ./...; \
 	$(MAKE) -f $(MAKEFILE) coverage
 
 unit-test: generate fmt vet manifests
@@ -65,7 +67,7 @@ unit-test: generate fmt vet manifests
 
 e2e-test: generate fmt vet manifests setup-envtest
 	go get golang.org/x/tools/cmd/cover; \
- 	NOOBAA_CORE_IMAGE={NOOBAA_CORE_IMAGE} NOOBAA_DB_IMAGE={NOOBAA_DB_IMAGE} go test -v -coverprofile coverage.out ./tests; \
+ 	KUBEBUILDER_ASSETS=$(ENVTEST_ASSETS_DIR)/bin NOOBAA_CORE_IMAGE={NOOBAA_CORE_IMAGE} NOOBAA_DB_IMAGE={NOOBAA_DB_IMAGE} go test -v -coverprofile coverage.out ./tests; \
 	$(MAKE) -f $(MAKEFILE) coverage
 
 # Build manager binary
