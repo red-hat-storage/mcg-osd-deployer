@@ -1,0 +1,8 @@
+---
+kind: Namespace
+apiVersion: v1
+metadata:
+  labels:
+    hive.openshift.io/managed: "true"
+    managed.openshift.io/storage-pv-quota-exempt: "true"
+  name: redhat-data-federation
