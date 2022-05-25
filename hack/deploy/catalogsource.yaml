@@ -1,0 +1,11 @@
+---
+kind: CatalogSource
+apiVersion: operators.coreos.com/v1alpha1
+metadata:
+  name: mcg-osd-deployer-catalog
+  namespace: redhat-data-federation
+spec:
+  image: quay.io/osd-addons/mcg-osd-dev:catalog-console-ci
+  displayName: CI
+  publisher: rexagod
+  sourceType: grpc

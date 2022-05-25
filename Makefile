@@ -240,7 +240,10 @@ OPM = $(shell which opm)
 endif
 endif
 BUNDLE_IMGS ?= $(BUNDLE_IMG) 
-CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:v$(VERSION) ifneq ($(origin CATALOG_BASE_IMG), undefined) FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG) endif 
+CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:v$(VERSION)
+ifneq ($(origin CATALOG_BASE_IMG), undefined)
+	FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
+endif 
 .PHONY: catalog-build
 catalog-build: opm
 	$(OPM) index add --container-tool docker --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
