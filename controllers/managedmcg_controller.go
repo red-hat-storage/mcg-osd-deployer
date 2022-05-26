@@ -179,12 +179,9 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 	switch {
 	case !r.managedMCG.DeletionTimestamp.IsZero():
 		if r.managedMCG.Status.Components.Noobaa.State == mcgv1alpha1.ComponentNotFound {
-			r.Log.Info("removing ManagedMCG finalizer")
-			r.managedMCG.SetFinalizers(utils.Remove(r.managedMCG.Finalizers, ManagedMCGFinalizer))
-			if err := r.update(r.managedMCG); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to remove ManagedMCG finalizer: %w", err)
+			if err := r.removeManagedMCG(); err != nil {
+				return ctrl.Result{}, err
 			}
-			r.Log.Info("ManagedMCG finalizer removed successfully")
 		} else {
 			if err := r.removeNoobaa(); err != nil {
 				return ctrl.Result{}, err
@@ -192,35 +189,27 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 		}
 	case r.managedMCG.UID != "":
 		if !utils.Contains(r.managedMCG.GetFinalizers(), ManagedMCGFinalizer) {
-			r.Log.Info("adding ManagedMCG finalizer")
-			r.managedMCG.SetFinalizers(append(r.managedMCG.GetFinalizers(), ManagedMCGFinalizer))
-			if err := r.update(r.managedMCG); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to add ManagedMCG finalizer: %w", err)
+			if err := r.addManagedMCG(); err != nil {
+				return ctrl.Result{}, err
 			}
 		}
-		r.reconcileStrategy = mcgv1alpha1.ReconcileStrategyStrict
+
 		if r.managedMCG.Spec.ReconcileStrategy == mcgv1alpha1.ReconcileStrategyNone {
 			r.reconcileStrategy = mcgv1alpha1.ReconcileStrategyNone
+		} else {
+			r.reconcileStrategy = mcgv1alpha1.ReconcileStrategyStrict
 		}
+
 		if err := r.updateAddonParams(); err != nil {
 			return ctrl.Result{}, err
 		}
-		if err := r.reconcileNoobaaComponent(); err != nil {
-			return ctrl.Result{}, err
-		}
-		if err := r.reconcileAlertMonitoring(); err != nil {
-			return ctrl.Result{}, err
-		}
 
-		if err := r.reconcileOCSCSV(); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		if err := r.ensureConsolePlugin(clusterVersion); err != nil {
+		if err := r.reconcileResources(); err != nil {
 			return ctrl.Result{}, err
 		}
 
 		r.managedMCG.Status.ReconcileStrategy = r.reconcileStrategy
+
 		if foundAddonDeletionKey && r.areComponentsReadyForUninstall() {
 			r.Log.Info("commencing addon deletion Components in ready state", "addon deletion key", foundAddonDeletionKey)
 			if err := r.delete(r.managedMCG); err != nil {
@@ -232,6 +221,46 @@ func (r *ManagedMCGReconciler) reconcilePhases() (reconcile.Result, error) {
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *ManagedMCGReconciler) reconcileResources() error {
+	if err := r.reconcileNoobaaComponent(); err != nil {
+		return err
+	}
+	if err := r.reconcileAlertMonitoring(); err != nil {
+		return err
+	}
+
+	if err := r.reconcileOCSCSV(); err != nil {
+		return err
+	}
+
+	if err := r.ensureConsolePlugin(clusterVersion); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *ManagedMCGReconciler) removeManagedMCG() error {
+	r.Log.Info("removing ManagedMCG finalizer")
+	r.managedMCG.SetFinalizers(utils.Remove(r.managedMCG.Finalizers, ManagedMCGFinalizer))
+	if err := r.update(r.managedMCG); err != nil {
+		return fmt.Errorf("failed to remove ManagedMCG finalizer: %w", err)
+	}
+	r.Log.Info("ManagedMCG finalizer removed successfully")
+
+	return nil
+}
+
+func (r *ManagedMCGReconciler) addManagedMCG() error {
+	r.Log.Info("adding ManagedMCG finalizer")
+	r.managedMCG.SetFinalizers(append(r.managedMCG.GetFinalizers(), ManagedMCGFinalizer))
+	if err := r.update(r.managedMCG); err != nil {
+		return fmt.Errorf("failed to add ManagedMCG finalizer: %w", err)
+	}
+
+	return nil
 }
 
 func (r *ManagedMCGReconciler) removeNoobaa() error {
