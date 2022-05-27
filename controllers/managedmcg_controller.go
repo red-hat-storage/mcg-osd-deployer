@@ -128,17 +128,17 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 //+kubebuilder:rbac:groups="",namespace=system,resources=configmaps,verbs=create;get;list;watch;update
 //+kubebuilder:rbac:groups="",namespace=system,resources=secrets,verbs=get;list;watch;create;update
 //+kubebuilder:rbac:groups="",namespace=system,resources={services,endpoints},verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="apps",namespace=system,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="apps",namespace=system,resources=deployments/finalizers,verbs=update
 //+kubebuilder:rbac:groups="apps",namespace=system,resources=statefulsets,verbs=get;list;watch
-//+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups="apps",resources=deployments/finalizers,verbs=update
 //+kubebuilder:rbac:groups="coordination.k8s.io",namespace=system,resources=leases,verbs=create;get;list;watch;update
 //+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources=podmonitors,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources=prometheusrules,verbs=get;list;watch;create;update
 //+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources=servicemonitors,verbs=get;list;watch;update;patch;create
 //+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources={alertmanagers,prometheuses,alertmanagerconfigs},verbs=get;list;watch;create;update
 //+kubebuilder:rbac:groups="networking.k8s.io",namespace=system,resources=networkpolicies,verbs=create;get;list;watch;update
-//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions/finalizers,verbs=update
+//+kubebuilder:rbac:groups=config.openshift.io,namespace=system,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=config.openshift.io,namespace=system,resources=clusterversions/finalizers,verbs=update
 //+kubebuilder:rbac:groups=console.openshift.io,resources=consoleplugins,verbs=*
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources=managedmcgs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources={managedmcgs,managedmcgs/finalizers},verbs=get;list;watch;create;update;patch;delete
@@ -714,6 +714,7 @@ func (r *ManagedMCGReconciler) ensureConsolePlugin(clusterVersion string) error 
 
 	// Create/Update mcg console Service
 	mcgConsoleService := console.GetService(r.ConsolePort, r.namespace)
+	r.Log.Info("creating or updating mcgConsoleService")
 	_, err = controllerutil.CreateOrUpdate(r.ctx, r.Client, mcgConsoleService, func() error {
 		err = controllerutil.SetControllerReference(mcgConsoleDeployment, mcgConsoleService, r.Scheme)
 		if err != nil {
@@ -728,6 +729,7 @@ func (r *ManagedMCGReconciler) ensureConsolePlugin(clusterVersion string) error 
 
 	// Create/Update mcg console ConsolePlugin
 	mcgConsolePlugin := console.GetConsolePluginCR(r.ConsolePort, basePath, r.namespace)
+	r.Log.Info("creating or updating mcgConsolePlugin")
 	_, err = controllerutil.CreateOrUpdate(r.ctx, r.Client, mcgConsolePlugin, func() error {
 		return nil
 	})
