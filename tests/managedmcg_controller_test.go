@@ -14,9 +14,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	noobaav1alpha1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
+	consolev1 "github.com/openshift/api/console/v1"
+	consolev1alpha1 "github.com/openshift/api/console/v1alpha1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	promv1a1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -82,6 +86,17 @@ var _ = Describe("ManagedMCGReconciler Reconcile", func() {
 			},
 		}
 
+		consoleDepFake := appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mcg-ms-console",
+				Namespace: namespace,
+			},
+		}
+		consolePluginFake := consolev1alpha1.ConsolePlugin{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "mcg-ms-console",
+			},
+		}
 		pagerDutySecretFake := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pagerduty-secret-fake",
@@ -164,6 +179,31 @@ var _ = Describe("ManagedMCGReconciler Reconcile", func() {
 			},
 		}
 
+		mcgCsv := opv1a1.ClusterServiceVersion{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mcg-osd-deployer",
+				Namespace: namespace,
+			},
+			Spec: opv1a1.ClusterServiceVersionSpec{
+				InstallStrategy: opv1a1.NamedInstallStrategy{
+					StrategySpec: opv1a1.StrategyDetailsDeployment{
+						DeploymentSpecs: []opv1a1.StrategyDeploymentSpec{
+							{
+								Name: "mcg-osd-deployer-controller-manager",
+								Spec: appsv1.DeploymentSpec{
+									Template: corev1.PodTemplateSpec{
+										Spec: corev1.PodSpec{
+											Containers: []corev1.Container{},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
 		newNamespace := namespaceFake.DeepCopy()
 		newManagedMCG := managedMCG.DeepCopy()
 		newOcscsv := ocscsv.DeepCopy()
@@ -177,25 +217,39 @@ var _ = Describe("ManagedMCGReconciler Reconcile", func() {
 		newAlertManagerConfig := alertmanagerConfigFake.DeepCopy()
 		newAlertRelabelConfigSecret := alertRelabelConfigSecretFake.DeepCopy()
 		newDMSRule := dmsRuleFake.DeepCopy()
+		newConsoleDeploymentFake := consoleDepFake.DeepCopy()
+		newConsolePluginFake := consolePluginFake.DeepCopy()
+		newMcgCsv := mcgCsv.DeepCopy()
 
 		BeforeEach(func() {
-			r.Scheme = k8sClient.Scheme()
-			r.Client = fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(newNamespace, newManagedMCG, newOcscsv,
-				newAddonSecret, newSMTPSecret, newDeadMansSecret, newPagerDutySecret, newNoobacsv, newPrometheus,
-				newAlertManager, newAlertManagerConfig, newAlertRelabelConfigSecret, newDMSRule).Build()
+			clientScheme := k8sClient.Scheme()
+			utilruntime.Must(consolev1.AddToScheme(clientScheme))
+			utilruntime.Must(consolev1alpha1.AddToScheme(clientScheme))
+
+			r.Scheme = clientScheme
 			r.AddonParamSecretName = newAddonSecret.Name
 			r.PagerdutySecretName = newPagerDutySecret.Name
 			r.DeadMansSnitchSecretName = newDeadMansSecret.Name
 			r.SMTPSecretName = newSMTPSecret.Name
 
 			r.CustomerNotificationHTMLPath = customerNotificationHTMLPath
+			r.ConsolePort = 24007
+
+			r.Client = fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(newNamespace, newManagedMCG, newOcscsv,
+				newAddonSecret, newSMTPSecret, newDeadMansSecret, newPagerDutySecret, newNoobacsv, newPrometheus,
+				newAlertManager, newAlertManagerConfig, newAlertRelabelConfigSecret, newDMSRule,
+				// newConsoleDeploymentFake).Build()
+				newConsoleDeploymentFake, newConsolePluginFake, newMcgCsv).Build()
 
 			err := os.WriteFile(customerNotificationHTMLPath, []byte{}, 0o444)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		AfterEach(func() {
-			err := r.Client.Delete(context.Background(), newOcscsv, &client.DeleteOptions{})
+			err := r.Client.Delete(context.Background(), newConsoleDeploymentFake, &client.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = r.Client.Delete(context.Background(), newOcscsv, &client.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			err = r.Client.Delete(context.Background(), newAddonSecret, &client.DeleteOptions{})
@@ -220,6 +274,9 @@ var _ = Describe("ManagedMCGReconciler Reconcile", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			err = os.Remove(customerNotificationHTMLPath)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = r.Client.Delete(context.Background(), newMcgCsv, &client.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
