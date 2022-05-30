@@ -58,17 +58,17 @@ setup-envtest:
 
 test: generate fmt vet manifests setup-envtest
 	go get golang.org/x/tools/cmd/cover; \
- 	KUBEBUILDER_ASSETS=$(ENVTEST_ASSETS_DIR)/bin NOOBAA_CORE_IMAGE={NOOBAA_CORE_IMAGE} NOOBAA_DB_IMAGE={NOOBAA_DB_IMAGE} go test -v -coverprofile coverage.out ./...; \
+ 	KUBEBUILDER_ASSETS=$(ENVTEST_ASSETS_DIR)/bin NOOBAA_CORE_IMAGE={NOOBAA_CORE_IMAGE} NOOBAA_DB_IMAGE={NOOBAA_DB_IMAGE} go test -v -coverprofile coverage.out ./... && \
 	$(MAKE) -f $(MAKEFILE) coverage
 
 unit-test: generate fmt vet manifests
 	go get golang.org/x/tools/cmd/cover; \
-	NOOBAA_CORE_IMAGE={NOOBAA_CORE_IMAGE} NOOBAA_DB_IMAGE={NOOBAA_DB_IMAGE} go test -v -coverprofile coverage.out ./controllers; \
+	NOOBAA_CORE_IMAGE={NOOBAA_CORE_IMAGE} NOOBAA_DB_IMAGE={NOOBAA_DB_IMAGE} go test -v -coverprofile coverage.out ./controllers && \
 	$(MAKE) -f $(MAKEFILE) coverage
 
 e2e-test: generate fmt vet manifests setup-envtest
 	go get golang.org/x/tools/cmd/cover; \
- 	KUBEBUILDER_ASSETS=$(ENVTEST_ASSETS_DIR)/bin NOOBAA_CORE_IMAGE={NOOBAA_CORE_IMAGE} NOOBAA_DB_IMAGE={NOOBAA_DB_IMAGE} go test -v -coverprofile coverage.out ./tests; \
+ 	KUBEBUILDER_ASSETS=$(ENVTEST_ASSETS_DIR)/bin NOOBAA_CORE_IMAGE={NOOBAA_CORE_IMAGE} NOOBAA_DB_IMAGE={NOOBAA_DB_IMAGE} go test -v -coverprofile coverage.out ./tests && \
 	$(MAKE) -f $(MAKEFILE) coverage
 
 # Build manager binary
