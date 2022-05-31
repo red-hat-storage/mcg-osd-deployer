@@ -79,7 +79,6 @@ func init() {
 
 	utilruntime.Must(consolev1.AddToScheme(scheme))
 	utilruntime.Must(consolev1alpha1.AddToScheme(scheme))
-
 }
 
 func main() {
