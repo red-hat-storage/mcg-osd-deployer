@@ -16,6 +16,7 @@ import (
 	noobaav1alpha1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	consolev1 "github.com/openshift/api/console/v1"
 	consolev1alpha1 "github.com/openshift/api/console/v1alpha1"
+	openshiftv1 "github.com/openshift/api/network/v1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	promv1a1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
@@ -225,6 +226,7 @@ var _ = Describe("ManagedMCGReconciler Reconcile", func() {
 			clientScheme := k8sClient.Scheme()
 			utilruntime.Must(consolev1.AddToScheme(clientScheme))
 			utilruntime.Must(consolev1alpha1.AddToScheme(clientScheme))
+			utilruntime.Must(openshiftv1.AddToScheme(clientScheme))
 
 			r.Scheme = clientScheme
 			r.AddonParamSecretName = newAddonSecret.Name
