@@ -1,0 +1,13 @@
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: mcg-osd-deployer-subscription
+  namespace: redhat-data-federation
+spec:
+  channel: alpha
+  installPlanApproval: Automatic
+  name: mcg-osd-deployer
+  source: mcg-osd-deployer-catalog
+  sourceNamespace: redhat-data-federation
+  startingCSV: mcg-osd-deployer.v1.0.0
