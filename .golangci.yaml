@@ -81,7 +81,6 @@ linters:
     - staticcheck
     - structcheck
     - stylecheck
-    - tagliatelle
     - tenv
     - thelper
     - tparallel
