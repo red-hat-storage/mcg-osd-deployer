@@ -338,7 +338,7 @@ func (r *ManagedMCGReconciler) reconcileAlertRelabelConfigSecret() error {
 			return err
 		}
 		alertRelabelConfig := []struct {
-			TargetLabel string `yaml:"targetLabel,omitempty"`
+			TargetLabel string `yaml:"target_label,omitempty"`
 			Replacement string `yaml:"replacement,omitempty"`
 		}{{
 			TargetLabel: "namespace",

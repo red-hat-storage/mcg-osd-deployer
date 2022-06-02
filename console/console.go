@@ -26,8 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-const mainBasePath = "/"
-const compatibilityBasePath = "/compatibility/"
+const (
+	mainBasePath          = "/"
+	compatibilityBasePath = "/compatibility/"
+)
 
 func GetDeployment(namespace string) *appsv1.Deployment {
 	return &appsv1.Deployment{
@@ -52,7 +54,8 @@ func GetService(port int, namespace string) *apiv1.Service {
 		},
 		Spec: apiv1.ServiceSpec{
 			Ports: []apiv1.ServicePort{
-				{Protocol: "TCP",
+				{
+					Protocol:   "TCP",
 					TargetPort: intstr.IntOrString{IntVal: int32(port)},
 					Port:       int32(port),
 					Name:       "console-port",
