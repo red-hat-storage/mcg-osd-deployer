@@ -701,6 +701,7 @@ func (r *ManagedMCGReconciler) getCSVByPrefix(name string) (*opv1a1.ClusterServi
 func (r *ManagedMCGReconciler) ensureConsolePlugin(clusterVersion string) error {
 	// The base path to where the plugin's assets are stored. ex: plugin-manifest.json
 	basePath := console.GetBasePath(clusterVersion)
+	fmt.Println("basePath: post : ", basePath, r.ConsolePort)
 
 	// Get mcg console Deployment
 	mcgConsoleDeployment := console.GetDeployment(r.namespace)
@@ -711,9 +712,10 @@ func (r *ManagedMCGReconciler) ensureConsolePlugin(clusterVersion string) error 
 	if err != nil {
 		return fmt.Errorf("failed to get the deployment, %w", err)
 	}
-
+	fmt.Println("basePath: r.namespace ", basePath, r.namespace)
 	// Create/Update mcg console Service
 	mcgConsoleService := console.GetService(r.ConsolePort, r.namespace)
+	fmt.Println(mcgConsoleService)
 	_, err = controllerutil.CreateOrUpdate(r.ctx, r.Client, mcgConsoleService, func() error {
 		err = controllerutil.SetControllerReference(mcgConsoleDeployment, mcgConsoleService, r.Scheme)
 		if err != nil {
@@ -728,6 +730,7 @@ func (r *ManagedMCGReconciler) ensureConsolePlugin(clusterVersion string) error 
 
 	// Create/Update mcg console ConsolePlugin
 	mcgConsolePlugin := console.GetConsolePluginCR(r.ConsolePort, basePath, r.namespace)
+	fmt.Println(mcgConsolePlugin)
 	_, err = controllerutil.CreateOrUpdate(r.ctx, r.Client, mcgConsolePlugin, func() error {
 		return nil
 	})

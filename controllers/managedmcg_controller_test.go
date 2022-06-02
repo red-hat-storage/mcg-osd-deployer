@@ -21,6 +21,12 @@ import (
 	"os"
 	"testing"
 
+	obv1 "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
+	noobaav1alpha1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
+	consolev1 "github.com/openshift/api/console/v1"
+	consolev1alpha1 "github.com/openshift/api/console/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
+
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	corev1 "k8s.io/api/core/v1"
@@ -53,6 +59,11 @@ func newSchemeFake() *runtime.Scheme {
 	utilruntime.Must(operatorv1.Install(schemeFake))
 	utilruntime.Must(promv1.AddToScheme(schemeFake))
 	utilruntime.Must(promv1a1.AddToScheme(schemeFake))
+	utilruntime.Must(noobaav1alpha1.SchemeBuilder.AddToScheme(schemeFake))
+	utilruntime.Must(obv1.AddToScheme(schemeFake))
+
+	utilruntime.Must(consolev1.AddToScheme(schemeFake))
+	utilruntime.Must(consolev1alpha1.AddToScheme(schemeFake))
 
 	return schemeFake
 }
@@ -70,6 +81,17 @@ func newManagedMCGFake() mcgv1alpha1.ManagedMCG {
 	}
 
 	return managedMCGFake
+}
+
+func newConsoleDeploymentFake() appsv1.Deployment {
+	ConsoleDepFake := appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mcg-ms-console",
+			Namespace: "openshift-storage",
+		},
+	}
+
+	return ConsoleDepFake
 }
 
 func newAddonSecretFake() corev1.Secret {
@@ -154,12 +176,14 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 	smtpsecretfake := newSMTPSecretFake()
 	pagerdutysecretFake := newPagerDutySecretFake()
 	deadmansercretFake := newDeadMansSecretFake()
+	consoleDepFake := newConsoleDeploymentFake()
 
 	r.AddonParamSecretName = "AddOnSecretfake"
 	r.DeadMansSnitchSecretName = "DeadMansSecretfake"
 	r.PagerdutySecretName = "PagerDutySecretfake"
 	r.SMTPSecretName = "SmtpSecretfake"
 	r.CustomerNotificationHTMLPath = CustomerNotificationHTMLPath
+	r.ConsolePort = 24007
 
 	data := []byte{}
 	err := os.WriteFile(CustomerNotificationHTMLPath, data, 0o444)
@@ -168,7 +192,8 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 	}
 
 	fakeClient := fake.NewClientBuilder().WithScheme(r.Scheme).WithObjects(&ocscsvFake,
-		&smtpsecretfake, &addonsecretFake, &deadmansercretFake, &pagerdutysecretFake, &managedMCGFake).Build()
+		&smtpsecretfake, &addonsecretFake, &deadmansercretFake, &pagerdutysecretFake,
+		&managedMCGFake, &consoleDepFake).Build()
 
 	r.Client = fakeClient
 	r.Log.Info("Reconciling ManagedMCG object")
