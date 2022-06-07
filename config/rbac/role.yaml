@@ -7,6 +7,60 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - clusterversions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - clusterversions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - console.openshift.io
+  resources:
+  - consoleplugins
+  verbs:
+  - '*'
+- apiGroups:
   - mcg.openshift.io
   resources:
   - managedmcgs
@@ -36,6 +90,12 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - objectbucket.io
+  resources:
+  - objectbucketclaims/finalizers
+  verbs:
+  - update
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -130,6 +190,7 @@ rules:
   resources:
   - backingstores
   verbs:
+  - delete
   - get
   - list
   - watch
@@ -139,6 +200,16 @@ rules:
   - bucketclasses
   verbs:
   - create
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - noobaa.io
+  resources:
+  - namespacestores
+  verbs:
+  - delete
   - get
   - list
   - watch
@@ -152,6 +223,15 @@ rules:
   - get
   - list
   - update
+  - watch
+- apiGroups:
+  - objectbucket.io
+  resources:
+  - objectbucketclaims
+  verbs:
+  - delete
+  - get
+  - list
   - watch
 - apiGroups:
   - operators.coreos.com

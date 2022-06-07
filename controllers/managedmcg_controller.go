@@ -55,6 +55,8 @@ const (
 	noobaaFinalizer   = "noobaa.io/graceful_finalizer"
 	noobaaName        = "noobaa"
 	clusterVersion    = "4.10"
+
+	ObjectBucketClaimFinalizer = "objectbucket.io/finalizer"
 )
 
 type ImageMap struct {
@@ -94,6 +96,11 @@ type ManagedMCGReconciler struct {
 	dmsRule                  *promv1.PrometheusRule
 	objectBucketClaim        *noobaav1alpha1.ObjectBucketClaim
 	bucketClass              *noobaav1alpha1.BucketClass
+
+	namespaceStore          *noobaav1alpha1.NamespaceStore
+	backingStore            *noobaav1alpha1.BackingStore
+	noobaaObjectBucketClaim *noobaav1alpha1.ObjectBucketClaim
+	noobaaBucketClass       *noobaav1alpha1.BucketClass
 }
 
 func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
@@ -112,6 +119,16 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 	r.objectBucketClaim = &noobaav1alpha1.ObjectBucketClaim{}
 	r.bucketClass = &noobaav1alpha1.BucketClass{}
 	r.bucketClass.Namespace = r.namespace
+
+	r.namespaceStore = &noobaav1alpha1.NamespaceStore{}
+	r.namespaceStore.Namespace = r.namespace
+	r.backingStore = &noobaav1alpha1.BackingStore{}
+	r.backingStore.Namespace = r.namespace
+	r.noobaaObjectBucketClaim = &noobaav1alpha1.ObjectBucketClaim{}
+	r.noobaaObjectBucketClaim.Namespace = r.namespace
+	r.noobaaBucketClass = &noobaav1alpha1.BucketClass{}
+	r.noobaaBucketClass.Namespace = r.namespace
+
 	r.initializePrometheusReconciler()
 }
 
@@ -121,9 +138,13 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 //+kubebuilder:rbac:groups="",namespace=system,resources=secrets,verbs=get;list;watch;create
 //+kubebuilder:rbac:groups="coordination.k8s.io",namespace=system,resources=leases,verbs=create;get;list;watch;update
 //+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=noobaas,verbs=get;list;watch;create;update;delete
-//+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=bucketclasses,verbs=get;list;watch;create;
+//+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=bucketclasses,verbs=get;list;watch;create;delete;
 //+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=backingstores,verbs=get;list;watch;
+//+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=backingstores,verbs=delete;
+//+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=namespacestores,verbs=get;list;watch;delete;
+//+kubebuilder:rbac:groups=objectbucket.io,namespace=system,resources=objectbucketclaims,verbs=get;list;watch;delete;
 //+kubebuilder:rbac:groups=objectbucket.io,resources=objectbucketclaims,verbs=get;list;watch;create;
+//+kubebuilder:rbac:groups=objectbucket.io,resources=objectbucketclaims/finalizers,verbs=update
 //+kubebuilder:rbac:groups=operators.coreos.com,namespace=system,resources=clusterserviceversions,verbs=get;list;watch;update;delete
 
 //+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources={alertmanagers,prometheuses,alertmanagerconfigs},verbs=get;list;watch;create;update
@@ -271,6 +292,59 @@ func (r *ManagedMCGReconciler) removeNoobaa() error {
 	}
 	if err := r.delete(r.noobaa); err != nil {
 		return fmt.Errorf("failed to delete Noobaa CR: %w", err)
+	}
+
+	namespaceStores := &noobaav1alpha1.NamespaceStoreList{}
+	if err := r.list(namespaceStores); err != nil {
+		return fmt.Errorf("failed to get the namespaceStores: %w", err)
+	}
+
+	for _, namespaceStore := range namespaceStores.Items {
+		r.namespaceStore.Name = namespaceStore.Name
+		if err := r.delete(r.namespaceStore); err != nil {
+			return fmt.Errorf("failed to delete namespaceStores: %w", err)
+		}
+	}
+
+	bucketClasses := &noobaav1alpha1.BucketClassList{}
+	if err := r.list(bucketClasses); err != nil {
+		return fmt.Errorf("failed to get the bucketClasses: %w", err)
+	}
+
+	for _, bucketClass := range bucketClasses.Items {
+		r.noobaaBucketClass.Name = bucketClass.Name
+		if err := r.delete(r.noobaaBucketClass); err != nil {
+			return fmt.Errorf("failed to delete bucketClasses: %w", err)
+		}
+	}
+
+	backingStores := &noobaav1alpha1.BackingStoreList{}
+	if err := r.list(backingStores); err != nil {
+		return fmt.Errorf("failed to get the backingStores: %w", err)
+	}
+
+	for _, backingStore := range backingStores.Items {
+		r.backingStore.Name = backingStore.Name
+		if err := r.delete(r.backingStore); err != nil {
+			return fmt.Errorf("failed to delete backingStores: %w", err)
+		}
+	}
+
+	objectBucketClaims := &noobaav1alpha1.ObjectBucketClaimList{}
+	if err := r.list(objectBucketClaims); err != nil {
+		return fmt.Errorf("failed to get the objectBucketClaims : %w", err)
+	}
+	for _, objectBucketClaim := range objectBucketClaims.Items {
+		r.noobaaObjectBucketClaim.Name = objectBucketClaim.Name
+		r.noobaaObjectBucketClaim.SetFinalizers(
+			utils.Remove(r.noobaaObjectBucketClaim.GetFinalizers(), ObjectBucketClaimFinalizer))
+		if err := r.Client.Update(r.ctx, r.noobaaObjectBucketClaim); err != nil {
+			return fmt.Errorf("failed to remove objectBucketClaims finalizer: %w", err)
+		}
+
+		if err := r.delete(r.noobaaObjectBucketClaim); err != nil {
+			return fmt.Errorf("failed to delete objectBucketClaims: %w", err)
+		}
 	}
 
 	return nil
