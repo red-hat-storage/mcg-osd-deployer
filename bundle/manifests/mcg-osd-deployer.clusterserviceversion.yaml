@@ -15,7 +15,7 @@ metadata:
       ]
     capabilities: Basic Install
     console.openshift.io/plugins: '["mcg-ms-console"]'
-    operators.operatorframework.io/builder: operator-sdk-v1.18.1
+    operators.operatorframework.io/builder: operator-sdk-v1.18.0+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: mcg-osd-deployer.v1.0.0
   namespace: placeholder
@@ -37,6 +37,54 @@ spec:
     spec:
       clusterPermissions:
       - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - services
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - clusterversions
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - clusterversions/finalizers
+          verbs:
+          - update
         - apiGroups:
           - console.openshift.io
           resources:
@@ -73,6 +121,12 @@ spec:
           - get
           - list
           - watch
+        - apiGroups:
+          - objectbucket.io
+          resources:
+          - objectbucketclaims/finalizers
+          verbs:
+          - update
         serviceAccountName: deployer
       deployments:
       - name: mcg-osd-deployer-controller-manager
@@ -126,7 +180,7 @@ spec:
                   value: registry.redhat.io/odf4/mcg-core-rhel8@sha256:4ff2d65ea16dd1026fe278a0f8ca920f300dfcee205b4b8ede0ab28be1aa43a6
                 - name: NOOBAA_DB_IMAGE
                   value: registry.redhat.io/rhel8/postgresql-12@sha256:be7212e938d1ef314a75aca070c28b6433cd0346704d0d3523c8ef403ff0c69e
-                image: quay.io/osd-addons/mcg-osd:0.1.0
+                image: quay.io/napaul/mcg-osd-deployer:v1.12
                 name: manager
                 resources:
                   limits:
@@ -142,7 +196,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
-                image: quay.io/osd-addons/mcg-osd:0.1.0
+                image: quay.io/napaul/mcg-osd-deployer:v1.12
                 name: readiness-server
                 readinessProbe:
                   httpGet:
@@ -382,14 +436,7 @@ spec:
           - delete
           - get
           - list
-          - update
           - watch
-        - apiGroups:
-          - objectbucket.io
-          resources:
-          - objectbucketclaims/finalizers
-          verbs:
-          - update
         - apiGroups:
           - operators.coreos.com
           resources:
