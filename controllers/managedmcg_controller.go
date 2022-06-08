@@ -454,6 +454,11 @@ func (r *ManagedMCGReconciler) reconcileOCSCSV() error {
 }
 
 func (r *ManagedMCGReconciler) setNoobaaDesiredState(desiredNoobaa *noobaav1alpha1.NooBaa) {
+	if defaultBackingStore, ok := desiredNoobaa.Annotations["default-backing-store"]; !ok && defaultBackingStore == "" {
+		desiredNoobaa.Annotations = map[string]string{
+			"default-backing-store": r.getDefaultBackingStore(),
+		}
+	}
 	coreResources := utils.GetResourceRequirements("noobaa-core")
 	dbResources := utils.GetResourceRequirements("noobaa-db")
 	dBVolumeResources := utils.GetResourceRequirements("noobaa-db-vol")

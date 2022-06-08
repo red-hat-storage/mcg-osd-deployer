@@ -59,14 +59,14 @@ func (r *ManagedMCGReconciler) watchBucketClass(object client.Object) {
 
 			return
 		}
-		annotations := object.GetAnnotations()
+		/*annotations := object.GetAnnotations()
 		if isCacheEnabled, ok := annotations[McgmsCacheEnabled]; ok && isCacheEnabled == "true" {
 			r.reconcileCacheBucketClass(object)
-		}
+		}*/
 	}
 }
 
-func (r *ManagedMCGReconciler) reconcileCacheBucketClass(object client.Object) {
+/*func (r *ManagedMCGReconciler) reconcileCacheBucketClass(object client.Object) {
 	r.Log.Info("Create Cache bucketClass for cache enabled namespacestores", "name", object.GetName())
 	bucketClass := r.setCacheBucketClassDesiredState(object)
 	if bucketClass == nil {
@@ -124,7 +124,7 @@ func (r *ManagedMCGReconciler) setCacheBucketClassDesiredState(object client.Obj
 	}
 
 	return bucketClass
-}
+}*/
 
 func (r *ManagedMCGReconciler) getDefaultBackingStore() string {
 	backingStores := noobaav1alpha1.BackingStoreList{}
@@ -133,8 +133,12 @@ func (r *ManagedMCGReconciler) getDefaultBackingStore() string {
 
 		return ""
 	}
+	if len(backingStores.Items) == 0 {
+
+		return ""
+	}
 	for _, backingStore := range backingStores.Items {
-		if strings.HasPrefix(backingStore.Name, DefaultBackingStore) {
+		if strings.Contains(backingStore.Name, DefaultBackingStore) {
 			return DefaultBackingStore
 		}
 	}
