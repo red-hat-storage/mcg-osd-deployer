@@ -15,7 +15,7 @@ metadata:
       ]
     capabilities: Basic Install
     console.openshift.io/plugins: '["mcg-ms-console"]'
-    operators.operatorframework.io/builder: operator-sdk-v1.18.0+git
+    operators.operatorframework.io/builder: operator-sdk-v1.18.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: mcg-osd-deployer.v1.0.0
   namespace: placeholder
@@ -37,18 +37,6 @@ spec:
     spec:
       clusterPermissions:
       - rules:
-        - apiGroups:
-          - ""
-          resources:
-          - services
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
         - apiGroups:
           - apps
           resources:
