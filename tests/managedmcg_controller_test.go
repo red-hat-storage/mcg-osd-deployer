@@ -14,11 +14,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	noobaav1alpha1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
+	consolev1 "github.com/openshift/api/console/v1"
 	consolev1alpha1 "github.com/openshift/api/console/v1alpha1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	promv1a1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -203,7 +205,11 @@ var _ = Describe("ManagedMCGReconciler Reconcile", func() {
 		newConsolePluginFake := consolePluginFake.DeepCopy()
 
 		BeforeEach(func() {
-			r.Scheme = k8sClient.Scheme()
+			clientScheme := k8sClient.Scheme()
+			utilruntime.Must(consolev1.AddToScheme(clientScheme))
+			utilruntime.Must(consolev1alpha1.AddToScheme(clientScheme))
+
+			r.Scheme = clientScheme
 			r.AddonParamSecretName = newAddonSecret.Name
 			r.PagerdutySecretName = newPagerDutySecret.Name
 			r.DeadMansSnitchSecretName = newDeadMansSecret.Name
