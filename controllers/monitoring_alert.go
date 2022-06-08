@@ -21,6 +21,10 @@ import (
 	"io/ioutil"
 	"strings"
 
+	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	netv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	promv1a1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/red-hat-storage/mcg-osd-deployer/templates"
@@ -75,6 +79,18 @@ func (r *ManagedMCGReconciler) initializePrometheusReconciler() {
 	r.smtpSecret = &corev1.Secret{}
 	r.smtpSecret.Name = r.SMTPSecretName
 	r.smtpSecret.Namespace = r.namespace
+
+	r.prometheusProxyNetworkPolicy = &netv1.NetworkPolicy{}
+	r.prometheusProxyNetworkPolicy.Name = prometheusProxyNetworkPolicyName
+	r.prometheusProxyNetworkPolicy.Namespace = r.namespace
+
+	r.prometheusService = &corev1.Service{}
+	r.prometheusService.Name = prometheusServiceName
+	r.prometheusService.Namespace = r.namespace
+
+	r.kubeRBACConfigMap = &corev1.ConfigMap{}
+	r.kubeRBACConfigMap.Name = templates.PrometheusKubeRBACPoxyConfigMapName
+	r.kubeRBACConfigMap.Namespace = r.namespace
 }
 
 func (r *ManagedMCGReconciler) reconcileAlertMonitoring() error {
@@ -303,32 +319,6 @@ func (r *ManagedMCGReconciler) reconcileAlertmanager() error {
 	return nil
 }
 
-func (r *ManagedMCGReconciler) reconcilePrometheus() error {
-	r.Log.Info("Reconciling Prometheus")
-	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.prometheus, func() error {
-		if err := r.own(r.prometheus); err != nil {
-			return err
-		}
-		desired := templates.PrometheusTemplate.DeepCopy()
-		r.prometheus.ObjectMeta.Labels = map[string]string{monLabelKey: monLabelValue}
-		r.prometheus.Spec = desired.Spec
-		r.prometheus.Spec.Alerting.Alertmanagers[0].Namespace = r.namespace
-		r.prometheus.Spec.AdditionalAlertRelabelConfigs = &corev1.SecretKeySelector{
-			LocalObjectReference: corev1.LocalObjectReference{
-				Name: alertRelabelConfigSecretName,
-			},
-			Key: alertRelabelConfigSecretKey,
-		}
-
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("unable to update prometheus: %w", err)
-	}
-
-	return nil
-}
-
 // AlertRelabelConfigSecret will have configuration for relabeling the alerts that are firing.
 // It will add namespace label to firing alerts before they are sent to the alertmanager.
 func (r *ManagedMCGReconciler) reconcileAlertRelabelConfigSecret() error {
@@ -356,6 +346,141 @@ func (r *ManagedMCGReconciler) reconcileAlertRelabelConfigSecret() error {
 	})
 	if err != nil {
 		return fmt.Errorf("unable to create/update AlertRelabelConfigSecret: %w", err)
+	}
+
+	return nil
+}
+
+func (r *ManagedMCGReconciler) reconcileKubeRBACConfigMap() error {
+	r.Log.Info("Reconciling kubeRBACConfigMap")
+
+	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.kubeRBACConfigMap, func() error {
+		if err := r.own(r.kubeRBACConfigMap); err != nil {
+			return err
+		}
+
+		r.kubeRBACConfigMap.Data = templates.KubeRBACProxyConfigMap.DeepCopy().Data
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("unable to create kubeRBACConfig config map: %w", err)
+	}
+
+	return nil
+}
+
+// reconcilePrometheusService function wait for prometheus Service
+// to start and sets appropriate annotation for 'service-ca' controller.
+func (r *ManagedMCGReconciler) reconcilePrometheusService() error {
+	r.Log.Info("Reconciling PrometheusService")
+
+	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.prometheusService, func() error {
+		if err := r.own(r.prometheusService); err != nil {
+			return err
+		}
+
+		r.prometheusService.Spec.Ports = []corev1.ServicePort{
+			{
+				Name:       "https",
+				Protocol:   corev1.ProtocolTCP,
+				Port:       int32(templates.KubeRBACProxyPortNumber),
+				TargetPort: intstr.FromString("https"),
+			},
+		}
+		r.prometheusService.Spec.Selector = map[string]string{
+			"app.kubernetes.io/name": r.prometheusService.Name,
+		}
+		utils.AddAnnotation(
+			r.prometheusService,
+			"service.beta.openshift.io/serving-cert-secret-name",
+			templates.PrometheusServingCertSecretName,
+		)
+		utils.AddAnnotation(
+			r.prometheusService,
+			"service.alpha.openshift.io/serving-cert-secret-name",
+			templates.PrometheusServingCertSecretName,
+		)
+		// This label is required to enable us to use metrics federation
+		// mechanism provided by Managed-tenants
+		utils.AddLabel(r.prometheusService, monLabelKey, monLabelValue)
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("unable to create/update PrometheusService: %w", err)
+	}
+
+	return nil
+}
+
+func (r *ManagedMCGReconciler) reconcilePrometheus() error {
+	r.Log.Info("Reconciling Prometheus")
+	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.prometheus, func() error {
+		if err := r.own(r.prometheus); err != nil {
+			return err
+		}
+		desired := templates.PrometheusTemplate.DeepCopy()
+		utils.AddLabel(r.prometheus, monLabelKey, monLabelValue)
+		deployerCSV, err := r.getCSVByPrefix(deployerCSVPrefix)
+		if err != nil {
+			return fmt.Errorf("unable to set image for kube-rbac-proxy container: %w", err)
+		}
+		deployerCSVDeployments := deployerCSV.Spec.InstallStrategy.StrategySpec.DeploymentSpecs
+		var deployerCSVDeployment *opv1a1.StrategyDeploymentSpec
+		for key := range deployerCSVDeployments {
+			deployment := &deployerCSVDeployments[key]
+			if deployment.Name == "mcg-osd-deployer-controller-manager" {
+				deployerCSVDeployment = deployment
+			}
+		}
+		deployerCSVContainers := deployerCSVDeployment.Spec.Template.Spec.Containers
+		var kubeRbacImage string
+		for key := range deployerCSVContainers {
+			container := deployerCSVContainers[key]
+			if container.Name == "kube-rbac-proxy" {
+				kubeRbacImage = container.Image
+			}
+		}
+		prometheusContainers := desired.Spec.Containers
+		for key := range prometheusContainers {
+			container := &prometheusContainers[key]
+			if container.Name == "kube-rbac-proxy" {
+				container.Image = kubeRbacImage
+			}
+		}
+		r.prometheus.Spec = desired.Spec
+		r.prometheus.Spec.Alerting.Alertmanagers[0].Namespace = r.namespace
+		r.prometheus.Spec.AdditionalAlertRelabelConfigs = &corev1.SecretKeySelector{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: alertRelabelConfigSecretName,
+			},
+			Key: alertRelabelConfigSecretKey,
+		}
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create/update Prometheus: %w", err)
+	}
+
+	return nil
+}
+
+func (r *ManagedMCGReconciler) reconcilePrometheusProxyNetworkPolicy() error {
+	r.Log.Info("reconciling PrometheusProxyNetworkPolicy resources")
+
+	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.prometheusProxyNetworkPolicy, func() error {
+		if err := r.own(r.prometheusProxyNetworkPolicy); err != nil {
+			return err
+		}
+		desired := templates.PrometheusProxyNetworkPolicyTemplate.DeepCopy()
+		r.prometheusProxyNetworkPolicy.Spec = desired.Spec
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update prometheus proxy NetworkPolicy: %w", err)
 	}
 
 	return nil

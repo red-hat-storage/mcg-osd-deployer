@@ -168,7 +168,7 @@ controller-gen:
 ifeq ($(origin PULL_NUMBER),undefined)
 	# [setting up controller-gen for local usage]
 	@ { \
-	GO111MODULES=off go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.4.1 ;\
+	GO111MODULES=off go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0 ;\
 	}
 CONTROLLER_GEN=$(shell which controller-gen)
 else
@@ -178,7 +178,7 @@ else
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.4.1 ;\
+	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONTROLLER_GEN=$(GOBIN)/controller-gen
