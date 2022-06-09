@@ -196,6 +196,7 @@ rules:
   resources:
   - backingstores
   verbs:
+  - delete
   - get
   - list
   - watch
@@ -205,6 +206,16 @@ rules:
   - bucketclasses
   verbs:
   - create
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - noobaa.io
+  resources:
+  - namespacestores
+  verbs:
+  - delete
   - get
   - list
   - watch
@@ -219,6 +230,22 @@ rules:
   - list
   - update
   - watch
+- apiGroups:
+  - objectbucket.io
+  resources:
+  - objectbucketclaims
+  verbs:
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - objectbucket.io
+  resources:
+  - objectbucketclaims/finalizers
+  verbs:
+  - update
 - apiGroups:
   - operators.coreos.com
   resources:
