@@ -1040,6 +1040,11 @@ func (in *NooBaaSpec) DeepCopyInto(out *NooBaaSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.DBConf != nil {
+		in, out := &in.DBConf, &out.DBConf
+		*out = new(string)
+		**out = **in
+	}
 	if in.CoreResources != nil {
 		in, out := &in.CoreResources, &out.CoreResources
 		*out = new(corev1.ResourceRequirements)
@@ -1340,6 +1345,7 @@ func (in *ServicesStatus) DeepCopyInto(out *ServicesStatus) {
 	*out = *in
 	in.ServiceMgmt.DeepCopyInto(&out.ServiceMgmt)
 	in.ServiceS3.DeepCopyInto(&out.ServiceS3)
+	in.ServiceSts.DeepCopyInto(&out.ServiceSts)
 	return
 }
 

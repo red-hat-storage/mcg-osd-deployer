@@ -19,6 +19,8 @@ package console
 import (
 	"strings"
 
+	"github.com/red-hat-storage/mcg-osd-deployer/templates"
+
 	consolev1alpha1 "github.com/openshift/api/console/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
@@ -30,6 +32,8 @@ const (
 	mainBasePath          = "/"
 	compatibilityBasePath = "/compatibility/"
 )
+
+var tlsService = "prometheus"
 
 func GetDeployment(namespace string) *appsv1.Deployment {
 	return &appsv1.Deployment{
@@ -81,6 +85,18 @@ func GetConsolePluginCR(consolePort int, basePath string, serviceNamespace strin
 				Namespace: serviceNamespace,
 				Port:      int32(consolePort),
 				BasePath:  basePath,
+			},
+			Proxy: []consolev1alpha1.ConsolePluginProxy{
+				{
+					Type:      consolev1alpha1.ProxyTypeService,
+					Alias:     tlsService + "-proxy",
+					Authorize: true,
+					Service: consolev1alpha1.ConsolePluginProxyServiceConfig{
+						Name:      tlsService,
+						Namespace: serviceNamespace,
+						Port:      int32(templates.KubeRBACProxyPortNumber),
+					},
+				},
 			},
 		},
 	}
