@@ -10,4 +10,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: mcg-osd-deployer-controller-manager
-  namespace: mcg-osd-deployer-system
+  namespace: redhat-data-federation

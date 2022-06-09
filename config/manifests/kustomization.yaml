@@ -1,3 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+patches:
+  - patch: '[{"op": "replace", "path": "/subjects/0/namespace", "value": "redhat-data-federation"}]'
+    target:
+      kind: ClusterRoleBinding
+      name: kube-rbac-proxy
+  - patch: '[{"op": "replace", "path": "/subjects/0/namespace", "value": "redhat-data-federation"}]'
+    target:
+      kind: ClusterRoleBinding
+      name: k8s-metrics-sm-prometheus-k8s
 # These resources constitute the fully configured set of manifests
 # used to generate the 'manifests/' directory in a bundle.
 resources:
