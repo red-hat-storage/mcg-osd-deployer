@@ -1,0 +1,10 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: downstream-prometheus-operator
+  namespace: redhat-data-federation
+spec:
+  displayName: downstream-prometheus-operator
+  image: quay.io/dbindra/ose-prometheus-operator:4.10.0_catsrc
+  publisher: RedHat
+  sourceType: grpc

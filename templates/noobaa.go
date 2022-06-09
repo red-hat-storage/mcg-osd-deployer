@@ -34,10 +34,10 @@ var NoobaaTemplate = &noobaa.NooBaa{
 				NumVolumes:   1,
 				VolumeResources: &v1.ResourceRequirements{
 					Requests: v1.ResourceList{
-						v1.ResourceStorage: resource.MustParse("16Gi"),
+						v1.ResourceStorage: resource.MustParse("32Gi"),
 					},
 					Limits: v1.ResourceList{
-						v1.ResourceStorage: resource.MustParse("16Gi"),
+						v1.ResourceStorage: resource.MustParse("32Gi"),
 					},
 				},
 			},
