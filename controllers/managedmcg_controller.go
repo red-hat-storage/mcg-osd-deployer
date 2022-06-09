@@ -34,6 +34,7 @@ import (
 	"github.com/red-hat-storage/mcg-osd-deployer/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	netv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -58,6 +59,8 @@ const (
 	clusterVersion                   = "4.10"
 	prometheusProxyNetworkPolicyName = "prometheus-proxy-rule"
 	prometheusServiceName            = "prometheus"
+
+	ObjectBucketClaimFinalizer = "objectbucket.io/finalizer"
 )
 
 type ImageMap struct {
@@ -100,6 +103,11 @@ type ManagedMCGReconciler struct {
 	prometheusProxyNetworkPolicy *netv1.NetworkPolicy
 	kubeRBACConfigMap            *v1.ConfigMap
 	prometheusService            *v1.Service
+
+	namespaceStore          *noobaav1alpha1.NamespaceStore
+	backingStore            *noobaav1alpha1.BackingStore
+	noobaaObjectBucketClaim *noobaav1alpha1.ObjectBucketClaim
+	noobaaBucketClass       *noobaav1alpha1.BucketClass
 }
 
 func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
@@ -138,23 +146,27 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 //+kubebuilder:rbac:groups="",namespace=system,resources=secrets,verbs=get;list;watch;create;update
 //+kubebuilder:rbac:groups="",namespace=system,resources={services,endpoints},verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="apps",namespace=system,resources=statefulsets,verbs=get;list;watch
-//+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups="apps",resources=deployments/finalizers,verbs=update
+//+kubebuilder:rbac:groups="apps",namespace=system,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="apps",namespace=system,resources=deployments/finalizers,verbs=update
 //+kubebuilder:rbac:groups="coordination.k8s.io",namespace=system,resources=leases,verbs=create;get;list;watch;update
 //+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources=podmonitors,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources=prometheusrules,verbs=get;list;watch;create;update
 //+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources=servicemonitors,verbs=get;list;watch;update;patch;create
 //+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources={alertmanagers,prometheuses,alertmanagerconfigs},verbs=get;list;watch;create;update
 //+kubebuilder:rbac:groups="networking.k8s.io",namespace=system,resources=networkpolicies,verbs=create;get;list;watch;update
-//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions/finalizers,verbs=update
+//+kubebuilder:rbac:groups=config.openshift.io,namespace=system,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=config.openshift.io,namespace=system,resources=clusterversions/finalizers,verbs=update
 //+kubebuilder:rbac:groups=console.openshift.io,resources=consoleplugins,verbs=*
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources=managedmcgs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources={managedmcgs,managedmcgs/finalizers},verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=backingstores,verbs=get;list;watch;
-//+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=bucketclasses,verbs=get;list;watch;create;
+//+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=backingstores,verbs=delete;
+//+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=namespacestores,verbs=get;list;watch;delete;
+//+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=bucketclasses,verbs=get;list;watch;create;delete;
 //+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=noobaas,verbs=get;list;watch;create;update;delete
+//+kubebuilder:rbac:groups=objectbucket.io,namespace=system,resources=objectbucketclaims,verbs=get;list;watch;delete;update;
 //+kubebuilder:rbac:groups=objectbucket.io,resources=objectbucketclaims,verbs=get;list;watch;create;
+//+kubebuilder:rbac:groups=objectbucket.io,namespace=system,resources=objectbucketclaims/finalizers,verbs=update
 //+kubebuilder:rbac:groups=operators.coreos.com,namespace=system,resources=clusterserviceversions,verbs=get;list;watch;update;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -340,7 +352,7 @@ func (r *ManagedMCGReconciler) removeNoobaa() error {
 		return fmt.Errorf("failed to get the objectBucketClaims : %w", err)
 	}
 	for _, objectBucketClaim := range objectBucketClaims.Items {
-		r.noobaaObjectBucketClaim.Name = objectBucketClaim.Name
+		r.noobaaObjectBucketClaim = objectBucketClaim.DeepCopy()
 		r.noobaaObjectBucketClaim.SetFinalizers(
 			utils.Remove(r.noobaaObjectBucketClaim.GetFinalizers(), ObjectBucketClaimFinalizer))
 		if err := r.Client.Update(r.ctx, r.noobaaObjectBucketClaim); err != nil {
