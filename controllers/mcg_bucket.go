@@ -70,7 +70,6 @@ func (r *ManagedMCGReconciler) getDefaultBackingStore() string {
 		return ""
 	}
 	if len(backingStores.Items) == 0 {
-
 		return ""
 	}
 	for _, backingStore := range backingStores.Items {
@@ -85,14 +84,13 @@ func (r *ManagedMCGReconciler) getDefaultBackingStore() string {
 func (r *ManagedMCGReconciler) isBucketClassCreationSuccess(object client.Object) bool {
 	basebucketClass, ok := object.(*noobaav1alpha1.BucketClass)
 	if !ok {
-
 		return false
 	}
 	if basebucketClass.Status.Phase != "Ready" {
-
 		return false
 	}
 	r.Log.Info("BucketClass creation was success", "name", basebucketClass.Name)
+
 	return true
 }
 
@@ -105,7 +103,6 @@ func (r *ManagedMCGReconciler) isOBCExists(object client.Object) bool {
 	}
 	for _, objectBucketClaim := range objectBucketClaims.Items {
 		if objectBucketClaim.Name == object.GetName() {
-
 			return true
 		}
 	}

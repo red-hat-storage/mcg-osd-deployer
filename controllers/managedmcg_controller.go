@@ -428,8 +428,8 @@ func (r *ManagedMCGReconciler) reconcileNoobaaComponent() error {
 	r.setNoobaaDesiredState(desiredNoobaa)
 	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.noobaa, func() error {
 		r.Log.Info("creating/updating Noobaa CR", "name", noobaaName)
-		if annotationDefaultBackingStore, ok := noobaaAnnotations["default-backing-store"]; (!ok || annotationDefaultBackingStore == "") &&
-			defaultBackingStore != "" {
+		annotationDefaultBackingStore, ok := noobaaAnnotations["default-backing-store"]
+		if (!ok || annotationDefaultBackingStore == "") && defaultBackingStore != "" {
 			utils.AddAnnotation(r.noobaa, "default-backing-store", defaultBackingStore)
 		}
 		r.noobaa.Spec = desiredNoobaa.Spec
