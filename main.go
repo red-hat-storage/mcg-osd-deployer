@@ -41,6 +41,7 @@ import (
 	obv1 "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	noobaa "github.com/noobaa/noobaa-operator/v5/pkg/apis"
 	noobaav1alpha1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
+	openshiftv1 "github.com/openshift/api/network/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -75,6 +76,7 @@ func init() {
 	utilruntime.Must(promv1a1.AddToScheme(scheme))
 	utilruntime.Must(noobaav1alpha1.SchemeBuilder.AddToScheme(scheme))
 	utilruntime.Must(obv1.AddToScheme(scheme))
+	utilruntime.Must(openshiftv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 
 	utilruntime.Must(consolev1.AddToScheme(scheme))

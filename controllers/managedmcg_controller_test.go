@@ -26,6 +26,7 @@ import (
 	consolev1 "github.com/openshift/api/console/v1"
 	consolev1alpha1 "github.com/openshift/api/console/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	netv1 "k8s.io/api/networking/v1"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
@@ -33,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	noobaa "github.com/noobaa/noobaa-operator/v5/pkg/apis"
+	openshiftv1 "github.com/openshift/api/network/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -63,6 +65,7 @@ func newSchemeFake() *runtime.Scheme {
 	utilruntime.Must(promv1a1.AddToScheme(schemeFake))
 	utilruntime.Must(noobaav1alpha1.SchemeBuilder.AddToScheme(schemeFake))
 	utilruntime.Must(obv1.AddToScheme(schemeFake))
+	utilruntime.Must(openshiftv1.AddToScheme(schemeFake))
 
 	utilruntime.Must(consolev1.AddToScheme(schemeFake))
 	utilruntime.Must(consolev1alpha1.AddToScheme(schemeFake))
@@ -189,6 +192,24 @@ func newMcgCsvFake() opv1a1.ClusterServiceVersion {
 	}
 }
 
+func newEgressNetworkPolicy() openshiftv1.EgressNetworkPolicy {
+	return openshiftv1.EgressNetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "Egress-rule",
+			Namespace: namespace,
+		},
+	}
+}
+
+func newIngressNetworkPolicy() netv1.NetworkPolicy {
+	return netv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "Ingress-rule",
+			Namespace: namespace,
+		},
+	}
+}
+
 // Remove extraneous artifacts after tests are executed.
 func cleanup() {
 	os.Remove(CustomerNotificationHTMLPath)
@@ -207,6 +228,8 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 	deadmansercretFake := newDeadMansSecretFake()
 	consoleDepFake := newConsoleDeploymentFake()
 	mcgcsvFake := newMcgCsvFake()
+	egressNetworkPolicy := newEgressNetworkPolicy()
+	ingressNetworkPolicy := newIngressNetworkPolicy()
 
 	r.AddonParamSecretName = "AddOnSecretfake"
 	r.DeadMansSnitchSecretName = "DeadMansSecretfake"
@@ -223,7 +246,7 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 
 	fakeClient := fake.NewClientBuilder().WithScheme(r.Scheme).WithObjects(&ocscsvFake,
 		&smtpsecretfake, &addonsecretFake, &deadmansercretFake, &pagerdutysecretFake,
-		&managedMCGFake, &consoleDepFake, &mcgcsvFake).Build()
+		&managedMCGFake, &consoleDepFake, &mcgcsvFake, &egressNetworkPolicy, &ingressNetworkPolicy).Build()
 
 	r.Client = fakeClient
 	r.Log.Info("Reconciling ManagedMCG object")

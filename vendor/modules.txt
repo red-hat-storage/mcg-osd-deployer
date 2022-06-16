@@ -183,6 +183,7 @@ github.com/onsi/gomega/types
 github.com/openshift/api/config/v1
 github.com/openshift/api/console/v1
 github.com/openshift/api/console/v1alpha1
+github.com/openshift/api/network/v1
 github.com/openshift/api/operator/v1
 # github.com/openshift/custom-resource-status v1.1.0
 ## explicit; go 1.12

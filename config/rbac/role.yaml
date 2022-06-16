@@ -182,6 +182,16 @@ rules:
   - update
   - watch
 - apiGroups:
+  - network.openshift.io
+  resources:
+  - egressnetworkpolicies
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
   - networking.k8s.io
   resources:
   - networkpolicies
