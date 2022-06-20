@@ -27,6 +27,7 @@ import (
 
 	"github.com/go-logr/logr"
 	openshiftv1 "github.com/openshift/api/network/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	promv1a1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
@@ -64,6 +65,8 @@ const (
 	egressNetworkPolicyName          = "egress-rule"
 	ingressNetworkPolicyName         = "ingress-rule"
 	ObjectBucketClaimFinalizer       = "objectbucket.io/finalizer"
+	mcgmsConsoleName                 = "mcg-ms-console"
+	operatorConsoleName              = "cluster"
 )
 
 type ImageMap struct {
@@ -114,6 +117,7 @@ type ManagedMCGReconciler struct {
 
 	egressNetworkPolicy  *openshiftv1.EgressNetworkPolicy
 	ingressNetworkPolicy *netv1.NetworkPolicy
+	operatorConsole      *operatorv1.Console
 }
 
 func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
@@ -151,6 +155,9 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 	r.ingressNetworkPolicy = &netv1.NetworkPolicy{}
 	r.ingressNetworkPolicy.Name = ingressNetworkPolicyName
 	r.ingressNetworkPolicy.Namespace = r.namespace
+
+	r.operatorConsole = &operatorv1.Console{}
+	r.operatorConsole.Name = operatorConsoleName
 }
 
 // Please keep the RBAC specifications below sorted, in order to prevent merge conflicts originating from this part of
@@ -183,6 +190,7 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 //+kubebuilder:rbac:groups=objectbucket.io,resources=objectbucketclaims,verbs=get;list;watch;create;
 //+kubebuilder:rbac:groups=objectbucket.io,namespace=system,resources=objectbucketclaims/finalizers,verbs=update
 //+kubebuilder:rbac:groups=operators.coreos.com,namespace=system,resources=clusterserviceversions,verbs=get;list;watch;update;delete
+//+kubebuilder:rbac:groups=operator.openshift.io,resources=consoles,verbs=get;list;watch;create;delete;update;
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -292,6 +300,10 @@ func (r *ManagedMCGReconciler) reconcileResources() error {
 		return err
 	}
 
+	if err := r.reconcileConsoleCluster(); err != nil {
+		return err
+	}
+
 	if err := r.reconcileEgressNetworkPolicy(); err != nil {
 		return err
 	}
@@ -354,7 +366,7 @@ func (r *ManagedMCGReconciler) reconcileEgressNetworkPolicy() error {
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to update egress network policy: %v", err)
+		return fmt.Errorf("failed to update egress network policy: %w", err)
 	}
 	r.Log.Info("egressNetworkPolicy applied successfully")
 
@@ -373,7 +385,7 @@ func (r *ManagedMCGReconciler) reconcileIngressNetworkPolicy() error {
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to update ingress network policy: %v", err)
+		return fmt.Errorf("failed to update ingress network policy: %w", err)
 	}
 	r.Log.Info("ingressNetworkPolicy applied successfully")
 
@@ -403,25 +415,6 @@ func (r *ManagedMCGReconciler) addManagedMCG() error {
 
 func (r *ManagedMCGReconciler) removeNoobaa() error {
 	r.Log.Info("removing Noobaa")
-	r.noobaa.SetFinalizers(utils.Remove(r.noobaa.GetFinalizers(), noobaaFinalizer))
-	if err := r.Client.Update(r.ctx, r.noobaa); err != nil {
-		return fmt.Errorf("failed to remove Noobaa finalizer: %w", err)
-	}
-	if err := r.delete(r.noobaa); err != nil {
-		return fmt.Errorf("failed to delete Noobaa CR: %w", err)
-	}
-
-	namespaceStores := &noobaav1alpha1.NamespaceStoreList{}
-	if err := r.list(namespaceStores); err != nil {
-		return fmt.Errorf("failed to get the namespaceStores: %w", err)
-	}
-
-	for _, namespaceStore := range namespaceStores.Items {
-		r.namespaceStore.Name = namespaceStore.Name
-		if err := r.delete(r.namespaceStore); err != nil {
-			return fmt.Errorf("failed to delete namespaceStores: %w", err)
-		}
-	}
 
 	bucketClasses := &noobaav1alpha1.BucketClassList{}
 	if err := r.list(bucketClasses); err != nil {
@@ -433,6 +426,14 @@ func (r *ManagedMCGReconciler) removeNoobaa() error {
 		if err := r.delete(r.noobaaBucketClass); err != nil {
 			return fmt.Errorf("failed to delete bucketClasses: %w", err)
 		}
+	}
+
+	r.noobaa.SetFinalizers(utils.Remove(r.noobaa.GetFinalizers(), noobaaFinalizer))
+	if err := r.Client.Update(r.ctx, r.noobaa); err != nil {
+		return fmt.Errorf("failed to remove Noobaa finalizer: %w", err)
+	}
+	if err := r.delete(r.noobaa); err != nil {
+		return fmt.Errorf("failed to delete Noobaa CR: %w", err)
 	}
 
 	backingStores := &noobaav1alpha1.BackingStoreList{}
@@ -458,13 +459,56 @@ func (r *ManagedMCGReconciler) removeNoobaa() error {
 		if err := r.Client.Update(r.ctx, r.noobaaObjectBucketClaim); err != nil {
 			return fmt.Errorf("failed to remove objectBucketClaims finalizer: %w", err)
 		}
+		r.deleteOBCResources(r.noobaaObjectBucketClaim.Name)
+	}
 
-		if err := r.delete(r.noobaaObjectBucketClaim); err != nil {
-			return fmt.Errorf("failed to delete objectBucketClaims: %w", err)
+	namespaceStores := &noobaav1alpha1.NamespaceStoreList{}
+	if err := r.list(namespaceStores); err != nil {
+		return fmt.Errorf("failed to get the namespaceStores: %w", err)
+	}
+
+	for _, namespaceStore := range namespaceStores.Items {
+		r.namespaceStore.Name = namespaceStore.Name
+		if err := r.delete(r.namespaceStore); err != nil {
+			return fmt.Errorf("failed to delete namespaceStores: %w", err)
 		}
 	}
 
 	return nil
+}
+
+func (r *ManagedMCGReconciler) deleteOBCResources(obcName string) {
+	configMap := &v1.ConfigMap{}
+	secret := &v1.Secret{}
+	configMap.Name = obcName
+	configMap.Namespace = r.namespace
+	err := r.get(configMap)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			r.Log.Error(err, "Unable to get  OBC configmap")
+		}
+	}
+
+	configMap.SetFinalizers(
+		utils.Remove(configMap.GetFinalizers(), ObjectBucketClaimFinalizer))
+	if err := r.Client.Update(r.ctx, configMap); err != nil {
+		r.Log.Error(err, "failed to remove objectBucketClaims configMap finalizer")
+	}
+	secret.Name = obcName
+	secret.Namespace = r.namespace
+
+	err = r.get(secret)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			r.Log.Error(err, "Unable to get  OBC secret")
+		}
+	}
+	secret.SetFinalizers(
+		utils.Remove(secret.GetFinalizers(), ObjectBucketClaimFinalizer))
+	if err := r.Client.Update(r.ctx, secret); err != nil {
+		r.Log.Error(err, "failed to remove objectBucketClaims secret finalizer")
+	}
+	r.Log.Info("OBC resources deleted")
 }
 
 func (r *ManagedMCGReconciler) updateAddonParams() error {
@@ -880,6 +924,31 @@ func (r *ManagedMCGReconciler) getCSVByPrefix(name string) (*opv1a1.ClusterServi
 	}
 
 	return csv, nil
+}
+
+func (r *ManagedMCGReconciler) reconcileConsoleCluster() error {
+	consoleList := operatorv1.ConsoleList{}
+	if err := r.Client.List(r.ctx, &consoleList); err != nil {
+		return fmt.Errorf("failed to reconcile console cluster, %w", err)
+	}
+	for _, cluster := range consoleList.Items {
+		if utils.Contains(cluster.Spec.Plugins, mcgmsConsoleName) {
+			r.Log.Info("Cluster instnce already exists.")
+
+			return nil
+		}
+	}
+	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.operatorConsole, func() error {
+		r.operatorConsole.Spec.Plugins = append(r.operatorConsole.Spec.Plugins, mcgmsConsoleName)
+		r.Log.Info("Updated Console resources")
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to reconcile ConsoleCluster: %w", err)
+	}
+
+	return nil
 }
 
 func (r *ManagedMCGReconciler) ensureConsolePlugin(clusterVersion string) error {

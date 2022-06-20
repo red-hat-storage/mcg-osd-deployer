@@ -29,6 +29,9 @@ var NetworkPolicyTemplate = netv1.NetworkPolicy{
 					{
 						PodSelector: &metav1.LabelSelector{},
 					},
+					{
+						NamespaceSelector: &metav1.LabelSelector{},
+					},
 				},
 			},
 		},
