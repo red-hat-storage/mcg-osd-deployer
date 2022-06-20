@@ -73,6 +73,17 @@ spec:
           - get
           - list
           - watch
+        - apiGroups:
+          - operator.openshift.io
+          resources:
+          - consoles
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - update
+          - watch
         serviceAccountName: deployer
       deployments:
       - name: mcg-osd-deployer-controller-manager

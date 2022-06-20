@@ -17,6 +17,7 @@ import (
 	consolev1 "github.com/openshift/api/console/v1"
 	consolev1alpha1 "github.com/openshift/api/console/v1alpha1"
 	openshiftv1 "github.com/openshift/api/network/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	promv1a1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
@@ -180,6 +181,16 @@ var _ = Describe("ManagedMCGReconciler Reconcile", func() {
 			},
 		}
 
+		consoleFake := operatorv1.Console{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mcg-ms-console-fake",
+				Namespace: namespace,
+			},
+			Spec: operatorv1.ConsoleSpec{
+				Plugins: []string{"fake-plugin"},
+			},
+		}
+
 		mcgCsv := opv1a1.ClusterServiceVersion{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mcg-osd-deployer",
@@ -221,12 +232,14 @@ var _ = Describe("ManagedMCGReconciler Reconcile", func() {
 		newConsoleDeploymentFake := consoleDepFake.DeepCopy()
 		newConsolePluginFake := consolePluginFake.DeepCopy()
 		newMcgCsv := mcgCsv.DeepCopy()
+		newConsoleFake := consoleFake.DeepCopy()
 
 		BeforeEach(func() {
 			clientScheme := k8sClient.Scheme()
 			utilruntime.Must(consolev1.AddToScheme(clientScheme))
 			utilruntime.Must(consolev1alpha1.AddToScheme(clientScheme))
 			utilruntime.Must(openshiftv1.AddToScheme(clientScheme))
+			utilruntime.Must(operatorv1.AddToScheme(clientScheme))
 
 			r.Scheme = clientScheme
 			r.AddonParamSecretName = newAddonSecret.Name
@@ -237,11 +250,12 @@ var _ = Describe("ManagedMCGReconciler Reconcile", func() {
 			r.CustomerNotificationHTMLPath = customerNotificationHTMLPath
 			r.ConsolePort = 24007
 
+
 			r.Client = fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(newNamespace, newManagedMCG, newOcscsv,
 				newAddonSecret, newSMTPSecret, newDeadMansSecret, newPagerDutySecret, newNoobacsv, newPrometheus,
 				newAlertManager, newAlertManagerConfig, newAlertRelabelConfigSecret, newDMSRule,
 				// newConsoleDeploymentFake).Build()
-				newConsoleDeploymentFake, newConsolePluginFake, newMcgCsv).Build()
+				newConsoleDeploymentFake, newConsolePluginFake, newMcgCsv, newConsoleFake).Build()
 
 			err := os.WriteFile(customerNotificationHTMLPath, []byte{}, 0o444)
 			Expect(err).NotTo(HaveOccurred())

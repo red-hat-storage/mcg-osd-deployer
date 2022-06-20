@@ -210,6 +210,23 @@ func newIngressNetworkPolicy() netv1.NetworkPolicy {
 	}
 }
 
+func newFakeBucketClass() noobaav1alpha1.BucketClass {
+	fakeBucketClass := noobaav1alpha1.BucketClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "fake-bucket-class",
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"mcgms-obc-namespace": namespace,
+			},
+		},
+		Status: noobaav1alpha1.BucketClassStatus{
+			Phase: "Ready",
+		},
+	}
+
+	return fakeBucketClass
+}
+
 // Remove extraneous artifacts after tests are executed.
 func cleanup() {
 	os.Remove(CustomerNotificationHTMLPath)
@@ -230,6 +247,7 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 	mcgcsvFake := newMcgCsvFake()
 	egressNetworkPolicy := newEgressNetworkPolicy()
 	ingressNetworkPolicy := newIngressNetworkPolicy()
+	newFakeBucketClass := newFakeBucketClass()
 
 	r.AddonParamSecretName = "AddOnSecretfake"
 	r.DeadMansSnitchSecretName = "DeadMansSecretfake"
@@ -246,7 +264,8 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 
 	fakeClient := fake.NewClientBuilder().WithScheme(r.Scheme).WithObjects(&ocscsvFake,
 		&smtpsecretfake, &addonsecretFake, &deadmansercretFake, &pagerdutysecretFake,
-		&managedMCGFake, &consoleDepFake, &mcgcsvFake, &egressNetworkPolicy, &ingressNetworkPolicy).Build()
+		&managedMCGFake, &consoleDepFake, &mcgcsvFake, &egressNetworkPolicy, &ingressNetworkPolicy,
+		&newFakeBucketClass).Build()
 
 	r.Client = fakeClient
 	r.Log.Info("Reconciling ManagedMCG object")
@@ -279,6 +298,16 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 
 	if err := r.removeOLMComponents(); err != nil {
 		t.Errorf("Error while removing OLM: %v", err)
+	}
+
+	r.watchBucketClass(&newFakeBucketClass)
+	obcList := noobaav1alpha1.ObjectBucketClaimList{}
+	err = r.list(&obcList)
+	if err != nil || len(obcList.Items) == 0 {
+		t.Errorf("Error while getting OBC: %v", err)
+	}
+	if obcList.Items[0].Name != "fake-bucket-class" || obcList.Items[0].Namespace != namespace {
+		t.Errorf("OBC creation is not proper: %v", err)
 	}
 
 	cleanup()
