@@ -118,6 +118,7 @@ type ManagedMCGReconciler struct {
 	egressNetworkPolicy  *openshiftv1.EgressNetworkPolicy
 	ingressNetworkPolicy *netv1.NetworkPolicy
 	operatorConsole      *operatorv1.Console
+	mcgConsoleService    *v1.Service
 }
 
 func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
@@ -346,6 +347,13 @@ func (r *ManagedMCGReconciler) reconcileEgressNetworkPolicy() error {
 			return fmt.Errorf("smtp secret does not contain a host entry")
 		}
 
+		if r.mcgConsoleService.UID == "" {
+			if err := r.get(r.mcgConsoleService); err != nil {
+				return fmt.Errorf("unable to get console service: %w", err)
+			}
+		}
+		consoleIP := r.mcgConsoleService.Spec.ClusterIP
+
 		dmsEgressRule := openshiftv1.EgressNetworkPolicyRule{}
 		dmsEgressRule.To.DNSName = snitchURL.Hostname()
 		dmsEgressRule.Type = openshiftv1.EgressNetworkPolicyRuleAllow
@@ -354,10 +362,15 @@ func (r *ManagedMCGReconciler) reconcileEgressNetworkPolicy() error {
 		smtpEgressRule.To.DNSName = smtpHost
 		smtpEgressRule.Type = openshiftv1.EgressNetworkPolicyRuleAllow
 
+		consoleIPRule := openshiftv1.EgressNetworkPolicyRule{}
+		consoleIPRule.To.DNSName = consoleIP
+		consoleIPRule.Type = openshiftv1.EgressNetworkPolicyRuleAllow
+
 		desired.Spec.Egress = append(
 			[]openshiftv1.EgressNetworkPolicyRule{
 				dmsEgressRule,
 				smtpEgressRule,
+				consoleIPRule,
 			},
 			desired.Spec.Egress...,
 		)
@@ -980,6 +993,7 @@ func (r *ManagedMCGReconciler) ensureConsolePlugin(clusterVersion string) error 
 		return fmt.Errorf("failed to create/update console service, %w", err)
 	}
 
+	r.mcgConsoleService = mcgConsoleService
 	// Create/Update mcg console ConsolePlugin
 	mcgConsolePlugin := console.GetConsolePluginCR(r.ConsolePort, basePath, r.namespace)
 	r.Log.Info("creating or updating mcgConsolePlugin")
