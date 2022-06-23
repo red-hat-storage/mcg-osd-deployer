@@ -1,0 +1,19 @@
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: df-dedicated-admin-role
+  labels:
+    managed.openshift.io/aggregate-to-dedicated-admins: cluster
+    olm.owner.kind: OperatorGroup
+rules:
+  - verbs:
+      - create
+      - delete
+      - get
+      - list
+      - watch
+    apiGroups:
+      - noobaa.io
+    resources:
+      - '*'
