@@ -590,6 +590,12 @@ func (r *ManagedMCGReconciler) reconcileNoobaaComponent() error {
 func (r *ManagedMCGReconciler) reconcileOCSCSV() error {
 	var csv *opv1a1.ClusterServiceVersion
 	var err error
+	subComponents := r.managedMCG.Status.Components
+	if subComponents.Noobaa.State != mcgv1alpha1.ComponentReady {
+		r.Log.Info("OCS resource deletion is waiting for Noobaa")
+
+		return nil
+	}
 	if csv, err = r.getCSVByPrefix("ocs-operator"); err != nil {
 		return err
 	}
