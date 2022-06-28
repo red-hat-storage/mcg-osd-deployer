@@ -3,6 +3,9 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: df-dedicated-admin-role
+  # aggregationRule will append below rules to dedicated-admins-cluster role if labels matchExpressions is valid
+  # aggregationRule : https://github.com/openshift/managed-cluster-config/blob/f4537242f9c54ee81bd049c458f3dc1e7ed9f838/deploy/rbac-permissions-operator-config/03-dedicated-admins-cluster.ClusterRole.yaml
+  # https://kubernetes.io/docs/reference/access-authn-authz/rbac/#aggregated-clusterroles
   labels:
     managed.openshift.io/aggregate-to-dedicated-admins: cluster
     olm.owner.kind: OperatorGroup
@@ -13,6 +16,8 @@ rules:
       - get
       - list
       - watch
+      - update
+      - patch
     apiGroups:
       - noobaa.io
     resources:
