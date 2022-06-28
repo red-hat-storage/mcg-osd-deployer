@@ -250,7 +250,6 @@ var _ = Describe("ManagedMCGReconciler Reconcile", func() {
 			r.CustomerNotificationHTMLPath = customerNotificationHTMLPath
 			r.ConsolePort = 24007
 
-
 			r.Client = fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(newNamespace, newManagedMCG, newOcscsv,
 				newAddonSecret, newSMTPSecret, newDeadMansSecret, newPagerDutySecret, newNoobacsv, newPrometheus,
 				newAlertManager, newAlertManagerConfig, newAlertRelabelConfigSecret, newDMSRule,

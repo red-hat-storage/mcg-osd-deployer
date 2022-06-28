@@ -31,8 +31,8 @@ type AnnotationsSpec map[string]Annotations
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=nb
-// +kubebuilder:printcolumn:name="Mgmt-Endpoints",type="string",JSONPath=".status.services.serviceMgmt.nodePorts",description="Management Endpoints"
 // +kubebuilder:printcolumn:name="S3-Endpoints",type="string",JSONPath=".status.services.serviceS3.nodePorts",description="S3 Endpoints"
+// +kubebuilder:printcolumn:name="Sts-Endpoints",type="string",JSONPath=".status.services.serviceSts.nodePorts",description="STS Endpoints"
 // +kubebuilder:printcolumn:name="Image",type="string",JSONPath=".status.actualImage",description="Actual Image"
 // +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase",description="Phase"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
@@ -79,6 +79,10 @@ type NooBaaSpec struct {
 	// DBImage (optional) overrides the default image for the db container
 	// +optional
 	DBImage *string `json:"dbImage,omitempty"`
+
+	// DBConf (optional) overrides the default postgresql db config
+	// +optional
+	DBConf *string `json:"dbConf,omitempty"`
 
 	// DBType (optional) overrides the default type image for the db container
 	// +optional
@@ -322,6 +326,8 @@ type AccountsStatus struct {
 type ServicesStatus struct {
 	ServiceMgmt ServiceStatus `json:"serviceMgmt"`
 	ServiceS3   ServiceStatus `json:"serviceS3"`
+	// +optional
+	ServiceSts ServiceStatus `json:"serviceSts,omitempty"`
 }
 
 // UserStatus is the status info of a user secret
@@ -396,6 +402,9 @@ const (
 // CleanupPolicySpec specifies the cleanup policy
 type CleanupPolicySpec struct {
 	Confirmation CleanupConfirmationProperty `json:"confirmation,omitempty"`
+
+	// +optional
+	AllowNoobaaDeletion bool `json:"allowNoobaaDeletion,omitempty"`
 }
 
 // CleanupConfirmationProperty is a string that specifies cleanup confirmation
