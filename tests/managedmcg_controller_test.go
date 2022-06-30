@@ -256,7 +256,7 @@ var _ = Describe("ManagedMCGReconciler Reconcile", func() {
 				// newConsoleDeploymentFake).Build()
 				newConsoleDeploymentFake, newConsolePluginFake, newMcgCsv, newConsoleFake).Build()
 
-			err := os.WriteFile(customerNotificationHTMLPath, []byte{}, 0o444)
+			err := os.WriteFile(customerNotificationHTMLPath, []byte{}, 0o600)
 			Expect(err).NotTo(HaveOccurred())
 		})
 

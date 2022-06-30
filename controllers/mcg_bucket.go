@@ -31,12 +31,14 @@ import (
 const (
 	McgmsObcNamespace   = "mcgms-obc-namespace"
 	DefaultBackingStore = "noobaa-default-backing-store"
+	READY               = "Ready"
 )
 
 func (r *ManagedMCGReconciler) bucketClassAdded(object client.Object) {
-	bucketName := object.GetName()
-	annotations := object.GetAnnotations()
-	if _, ok := annotations[McgmsObcNamespace]; ok && r.isBucketClassCreationSuccess(object) {
+	basebucketClass, _ := object.(*noobaav1alpha1.BucketClass)
+	bucketName := basebucketClass.Name
+	annotations := basebucketClass.Annotations
+	if _, ok := annotations[McgmsObcNamespace]; ok && r.isBucketClassCreationSuccess(*basebucketClass) {
 		if r.ctx == nil {
 			r.ctx = context.Background()
 		}
@@ -46,7 +48,7 @@ func (r *ManagedMCGReconciler) bucketClassAdded(object client.Object) {
 			return
 		}
 		r.objectBucketClaim = &noobaav1alpha1.ObjectBucketClaim{}
-		obc := r.setOBCDesiredState(bucketName, object)
+		obc := r.setOBCDesiredState(bucketName, *basebucketClass)
 		_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.objectBucketClaim, func() error {
 			r.Log.Info("Creating OBC ", "name", bucketName)
 			r.objectBucketClaim.ObjectMeta.OwnerReferences = obc.ObjectMeta.OwnerReferences
@@ -81,20 +83,24 @@ func (r *ManagedMCGReconciler) getDefaultBackingStore() string {
 	return backingStores.Items[0].Name
 }
 
-func (r *ManagedMCGReconciler) isBucketClassCreationSuccess(object client.Object) bool {
+func (r *ManagedMCGReconciler) isBucketClassCreationSuccess(bucketClass noobaav1alpha1.BucketClass) bool {
+	if bucketClass.Status.Phase == READY {
+		return true
+	}
+
 	timeout := 10 * time.Second
 	interval := 2 * time.Second
 	err := utilwait.PollImmediate(interval, timeout, func() (done bool, err error) {
 		r.bucketClass = &noobaav1alpha1.BucketClass{}
-		r.bucketClass.Name = object.GetName()
-		r.bucketClass.Namespace = object.GetNamespace()
+		r.bucketClass.Name = bucketClass.GetName()
+		r.bucketClass.Namespace = bucketClass.GetNamespace()
 		err = r.get(r.bucketClass)
 		if err != nil {
 			r.Log.Error(err, "Unable to get bucketClass")
 
 			return false, nil
 		}
-		if r.bucketClass.Status.Phase != "Ready" {
+		if r.bucketClass.Status.Phase != READY {
 			return false, nil
 		}
 
@@ -122,32 +128,32 @@ func (r *ManagedMCGReconciler) getObjectBucketClaim(object client.Object) *v1alp
 	return &objectBucketClaim
 }
 
-func (r *ManagedMCGReconciler) setOBCDesiredState(bucketName string, object client.Object) v1alpha1.ObjectBucketClaim {
+func (r *ManagedMCGReconciler) setOBCDesiredState(bucketName string,
+	bucketClass noobaav1alpha1.BucketClass,
+) v1alpha1.ObjectBucketClaim {
 	AdditionalConfigMap := make(map[string]string)
 	AdditionalConfigMap["bucketclass"] = bucketName
 	obc := noobaav1alpha1.ObjectBucketClaim{
 		Spec: noobaav1alpha1.ObjectBucketClaimSpec{
 			BucketName:         bucketName,
-			StorageClassName:   object.GetNamespace() + ".noobaa.io",
+			StorageClassName:   bucketClass.GetNamespace() + ".noobaa.io",
 			GenerateBucketName: bucketName,
 			AdditionalConfig:   AdditionalConfigMap,
 		},
 	}
 	r.objectBucketClaim.Name = bucketName
-	r.objectBucketClaim.Namespace = r.getOBCCreationNamespace(object)
-	if basebucketClass, ok := object.(*noobaav1alpha1.BucketClass); ok {
-		obc.ObjectMeta.OwnerReferences = basebucketClass.OwnerReferences
-	}
+	r.objectBucketClaim.Namespace = r.getOBCCreationNamespace(bucketClass)
+	obc.ObjectMeta.OwnerReferences = bucketClass.OwnerReferences
 
 	return obc
 }
 
-func (r *ManagedMCGReconciler) getOBCCreationNamespace(object client.Object) string {
-	if obcNamespace, ok := object.GetAnnotations()[McgmsObcNamespace]; ok {
+func (r *ManagedMCGReconciler) getOBCCreationNamespace(bucketClass noobaav1alpha1.BucketClass) string {
+	if obcNamespace, ok := bucketClass.GetAnnotations()[McgmsObcNamespace]; ok {
 		return obcNamespace
 	}
 
-	return object.GetNamespace()
+	return bucketClass.GetNamespace()
 }
 
 func (r *ManagedMCGReconciler) bucketClassDeleted(object client.Object) {

@@ -257,7 +257,7 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 	r.ConsolePort = 24007
 
 	data := []byte{}
-	err := os.WriteFile(CustomerNotificationHTMLPath, data, 0o444)
+	err := os.WriteFile(CustomerNotificationHTMLPath, data, 0o600)
 	if err != nil {
 		t.Errorf("Can not create file : %v", err)
 	}
