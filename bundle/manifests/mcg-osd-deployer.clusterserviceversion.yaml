@@ -70,6 +70,7 @@ spec:
           - objectbucketclaims
           verbs:
           - create
+          - delete
           - get
           - list
           - watch

@@ -93,6 +93,7 @@ var PrometheusTemplate = promv1.Prometheus{
 						MountPath: "/etc/kube-rbac-config",
 					},
 				},
+				Resources: utils.GetResourceRequirements("kube-rbac-proxy"),
 			}},
 		},
 		RuleSelector: &resourceSelector,

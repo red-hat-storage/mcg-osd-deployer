@@ -46,6 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -187,7 +188,7 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 //+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=bucketclasses,verbs=get;list;watch;create;delete;
 //+kubebuilder:rbac:groups=noobaa.io,namespace=system,resources=noobaas,verbs=get;list;watch;create;update;delete
 //+kubebuilder:rbac:groups=objectbucket.io,namespace=system,resources=objectbucketclaims,verbs=get;list;watch;delete;update;
-//+kubebuilder:rbac:groups=objectbucket.io,resources=objectbucketclaims,verbs=get;list;watch;create;
+//+kubebuilder:rbac:groups=objectbucket.io,resources=objectbucketclaims,verbs=get;list;watch;create;delete
 //+kubebuilder:rbac:groups=objectbucket.io,namespace=system,resources=objectbucketclaims/finalizers,verbs=update
 //+kubebuilder:rbac:groups=operators.coreos.com,namespace=system,resources=clusterserviceversions,verbs=get;list;watch;update;delete
 //+kubebuilder:rbac:groups=operator.openshift.io,resources=consoles,verbs=get;list;watch;create;delete;update;
@@ -738,19 +739,6 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		},
 	)
 
-	enqueueBucketClassRequest := handler.EnqueueRequestsFromMapFunc(
-		func(object client.Object) []reconcile.Request {
-			r.watchBucketClass(object)
-
-			return []reconcile.Request{{
-				NamespacedName: types.NamespacedName{
-					Name:      ManagedMCGName,
-					Namespace: object.GetNamespace(),
-				},
-			}}
-		},
-	)
-
 	configMapPredicates := builder.WithPredicates(
 		predicate.NewPredicateFuncs(
 			func(client client.Object) bool {
@@ -799,15 +787,28 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		),
 	)
 
-	bucketclassPredicates := builder.WithPredicates(
-		predicate.NewPredicateFuncs(
-			func(object client.Object) bool {
-				annotations := object.GetAnnotations()
-				_, ok := annotations[McgmsObcNamespace]
+	bucketclassPredicates := builder.WithPredicates(predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			r.bucketClassAdded(e.Object)
 
-				return ok
-			},
-		),
+			return true
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			r.bucketClassDeleted(e.Object)
+
+			return true
+		},
+	})
+
+	enqueueBucketClassRequest := handler.EnqueueRequestsFromMapFunc(
+		func(object client.Object) []reconcile.Request {
+			return []reconcile.Request{{
+				NamespacedName: types.NamespacedName{
+					Name:      ManagedMCGName,
+					Namespace: object.GetNamespace(),
+				},
+			}}
+		},
 	)
 
 	err := ctrl.NewControllerManagedBy(mgr).
