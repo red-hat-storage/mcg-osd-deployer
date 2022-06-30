@@ -17,7 +17,7 @@ fi
 if ! command -v golangci-lint > /dev/null; then
   echo "golangci-lint is not installed, installing..."
   # Fetch golangci-lint binary
-  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b "$(go env GOBIN)" v1.46.2
+  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b "$(go env GOBIN)" latest
 fi
 
 echo "[Running golangci-lint]"
