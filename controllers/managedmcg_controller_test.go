@@ -257,7 +257,7 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 	r.ConsolePort = 24007
 
 	data := []byte{}
-	err := os.WriteFile(CustomerNotificationHTMLPath, data, 0o444)
+	err := os.WriteFile(CustomerNotificationHTMLPath, data, 0o600)
 	if err != nil {
 		t.Errorf("Can not create file : %v", err)
 	}
@@ -300,7 +300,7 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 		t.Errorf("Error while removing OLM: %v", err)
 	}
 
-	r.watchBucketClass(&newFakeBucketClass)
+	r.bucketClassAdded(&newFakeBucketClass)
 	obcList := noobaav1alpha1.ObjectBucketClaimList{}
 	err = r.list(&obcList)
 	if err != nil || len(obcList.Items) == 0 {
@@ -310,5 +310,11 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 		t.Errorf("OBC creation is not proper: %v", err)
 	}
 
+	r.bucketClassDeleted(&newFakeBucketClass)
+	obcDeleteList := noobaav1alpha1.ObjectBucketClaimList{}
+	err = r.list(&obcDeleteList)
+	if err != nil || len(obcDeleteList.Items) > 0 {
+		t.Errorf("OBC is not deleted: %v", err)
+	}
 	cleanup()
 }

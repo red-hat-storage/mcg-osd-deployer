@@ -62,4 +62,14 @@ var ResourceRequirements = map[string]corev1.ResourceRequirements{
 			"memory": resource.MustParse("200Mi"),
 		},
 	},
+	"kube-rbac-proxy": {
+		Limits: corev1.ResourceList{
+			"memory": resource.MustParse("30Mi"),
+			"cpu":    resource.MustParse("50m"),
+		},
+		Requests: corev1.ResourceList{
+			"memory": resource.MustParse("30Mi"),
+			"cpu":    resource.MustParse("50m"),
+		},
+	},
 }
