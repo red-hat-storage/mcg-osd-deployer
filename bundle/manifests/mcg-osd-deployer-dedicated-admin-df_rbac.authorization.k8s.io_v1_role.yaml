@@ -25,3 +25,5 @@ rules:
   - get
   - list
   - watch
+  - delete
+  - update
