@@ -16,3 +16,12 @@ rules:
   - watch
   - update
   - patch
+- apiGroups:
+  - objectbucket.io
+  resources:
+  - objectbucketclaims
+  verbs:
+  - create
+  - get
+  - list
+  - watch

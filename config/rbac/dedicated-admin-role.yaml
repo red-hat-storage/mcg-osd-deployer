@@ -3,7 +3,9 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: dedicated-admin-df
 rules:
-  - verbs:
+  - apiGroups:
+      - noobaa.io
+    verbs:
       - create
       - delete
       - get
@@ -11,7 +13,16 @@ rules:
       - watch
       - update
       - patch
-    apiGroups:
-      - noobaa.io
     resources:
       - '*'
+  - apiGroups:
+      - objectbucket.io
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - delete
+      - update
+    resources:
+      - objectbucketclaims
