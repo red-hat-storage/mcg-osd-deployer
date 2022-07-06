@@ -1,0 +1,29 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  creationTimestamp: null
+  name: mcg-osd-deployer-dedicated-admin-df
+rules:
+- apiGroups:
+  - noobaa.io
+  resources:
+  - '*'
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - watch
+  - update
+  - patch
+- apiGroups:
+  - objectbucket.io
+  resources:
+  - objectbucketclaims
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - delete
+  - update

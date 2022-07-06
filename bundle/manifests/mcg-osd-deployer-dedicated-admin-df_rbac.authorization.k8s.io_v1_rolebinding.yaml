@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  creationTimestamp: null
+  name: mcg-osd-deployer-dedicated-admin-df
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: mcg-osd-deployer-dedicated-admin-df
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: dedicated-admins
+- kind: Group
+  name: system:serviceaccounts:dedicated-admin
