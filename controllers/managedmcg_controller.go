@@ -26,6 +26,7 @@ import (
 	noobaav1alpha1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 
 	"github.com/go-logr/logr"
+	configv1 "github.com/openshift/api/config/v1"
 	openshiftv1 "github.com/openshift/api/network/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -60,7 +61,6 @@ const (
 	deployerCSVPrefix                = "mcg-osd-deployer"
 	noobaaFinalizer                  = "noobaa.io/graceful_finalizer"
 	noobaaName                       = "noobaa"
-	clusterVersion                   = "4.10"
 	prometheusProxyNetworkPolicyName = "prometheus-proxy-rule"
 	prometheusServiceName            = "prometheus"
 	egressNetworkPolicyName          = "egress-rule"
@@ -177,8 +177,8 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 //+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources={alertmanagers,prometheuses,alertmanagerconfigs},verbs=get;list;watch;create;update
 //+kubebuilder:rbac:groups="networking.k8s.io",namespace=system,resources=networkpolicies,verbs=create;get;list;watch;update
 //+kubebuilder:rbac:groups="network.openshift.io",namespace=system,resources=egressnetworkpolicies,verbs=create;get;list;watch;update
-//+kubebuilder:rbac:groups=config.openshift.io,namespace=system,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=config.openshift.io,namespace=system,resources=clusterversions/finalizers,verbs=update
+//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions/finalizers,verbs=update
 //+kubebuilder:rbac:groups=console.openshift.io,resources=consoleplugins,verbs=*
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources=managedmcgs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=mcg.openshift.io,resources={managedmcgs,managedmcgs/finalizers},verbs=get;list;watch;create;update;patch;delete
@@ -297,7 +297,7 @@ func (r *ManagedMCGReconciler) reconcileResources() error {
 		return err
 	}
 
-	if err := r.ensureConsolePlugin(clusterVersion); err != nil {
+	if err := r.ensureConsolePlugin(); err != nil {
 		return err
 	}
 
@@ -958,13 +958,18 @@ func (r *ManagedMCGReconciler) reconcileConsoleCluster() error {
 	return nil
 }
 
-func (r *ManagedMCGReconciler) ensureConsolePlugin(clusterVersion string) error {
+func (r *ManagedMCGReconciler) ensureConsolePlugin() error {
+	clusterVersion, err := r.determineOpenShiftVersion()
+
+	if err != nil {
+		return fmt.Errorf("failed to get the cluster version, %w", err)
+	}
+
 	// The base path to where the plugin's assets are stored. ex: plugin-manifest.json
 	basePath := console.GetBasePath(clusterVersion)
-
 	// Get mcg console Deployment
 	mcgConsoleDeployment := console.GetDeployment(r.namespace)
-	err := r.Client.Get(r.ctx, types.NamespacedName{
+	err = r.Client.Get(r.ctx, types.NamespacedName{
 		Name:      mcgConsoleDeployment.Name,
 		Namespace: mcgConsoleDeployment.Namespace,
 	}, mcgConsoleDeployment)
@@ -998,4 +1003,17 @@ func (r *ManagedMCGReconciler) ensureConsolePlugin(clusterVersion string) error 
 	}
 
 	return nil
+}
+
+func (r *ManagedMCGReconciler) determineOpenShiftVersion() (string, error) {
+	clusterVersionList := configv1.ClusterVersionList{}
+	if err := r.Client.List(r.ctx, &clusterVersionList); err != nil {
+		return "", fmt.Errorf("failed to get the clusterversion, %w", err)
+	}
+	clusterVersion := ""
+	for _, version := range clusterVersionList.Items {
+		clusterVersion = version.Status.Desired.Version
+	}
+
+	return clusterVersion, nil
 }
