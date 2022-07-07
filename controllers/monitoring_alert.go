@@ -17,6 +17,7 @@ limitations under the License.
 package controllers
 
 import (
+	_ "embed"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -32,6 +33,7 @@ import (
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -43,9 +45,13 @@ const (
 	alertRelabelConfigSecretName = "managed-mcg-alert-relabel-config-secret"
 	alertmanagerName             = "managed-mcg-alertmanager"
 	notificationEmailKeyPrefix   = "notification-email"
+	noobaaRulesName              = "managed-mcg-noobaa-rules"
 	dmsRuleName                  = "dms-monitor-rule"
 	alertmanagerConfigName       = "managed-mcg-alertmanager-config"
 )
+
+//go:embed noobaa-rules.yaml
+var noobaaRulesSpec []byte
 
 func (r *ManagedMCGReconciler) initializePrometheusReconciler() {
 	r.prometheus = &promv1.Prometheus{}
@@ -63,6 +69,10 @@ func (r *ManagedMCGReconciler) initializePrometheusReconciler() {
 	r.dmsRule = &promv1.PrometheusRule{}
 	r.dmsRule.Name = dmsRuleName
 	r.dmsRule.Namespace = r.namespace
+
+	r.noobaaRules = &promv1.PrometheusRule{}
+	r.noobaaRules.Name = noobaaRulesName
+	r.noobaaRules.Namespace = r.namespace
 
 	r.deadMansSnitchSecret = &corev1.Secret{}
 	r.deadMansSnitchSecret.Name = r.DeadMansSnitchSecretName
@@ -112,6 +122,9 @@ func (r *ManagedMCGReconciler) reconcileAlertMonitoring() error {
 	if err := r.reconcileDMSPrometheusRule(); err != nil {
 		return err
 	}
+	if err := r.reconcileNoobaaRules(); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -138,6 +151,26 @@ func (r *ManagedMCGReconciler) reconcileDMSPrometheusRule() error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed to reconcile DMS Prometheus Rule: %w", err)
+	}
+
+	return nil
+}
+
+func (r *ManagedMCGReconciler) reconcileNoobaaRules() error {
+	r.Log.Info("Reconciling custom Noobaa Prometheus Rules")
+
+	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.noobaaRules, func() error {
+		if err := r.own(r.noobaaRules); err != nil {
+			return err
+		}
+		if err := k8syaml.Unmarshal(noobaaRulesSpec, &r.noobaaRules.Spec); err != nil {
+			return fmt.Errorf("failed to unmarshal noobaa-rules.yaml: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to reconcile custom Noobaa Prometheus Rules: %w", err)
 	}
 
 	return nil
@@ -180,7 +213,17 @@ func (r *ManagedMCGReconciler) reconcileMonitoringResources() error {
 	}
 	for i := range promRuleList.Items {
 		obj := promRuleList.Items[i]
-		utils.AddLabel(obj, monLabelKey, monLabelValue)
+		// do not include the original noobaa rules (deployed by mcg-operator)
+		// in the rule files set that our external prometheus instance will load
+		if obj.GetName() == "noobaa-prometheus-rules" {
+			r.Log.Info("found noobaa prometheus rules, checking for inclusion")
+			if v, ok := obj.GetLabels()[monLabelKey]; ok && v == monLabelValue {
+				utils.RemoveLabel(obj, monLabelKey)
+				r.Log.Info(fmt.Sprintf("removed label %s=%s from noobaa prometheus rules", monLabelKey, monLabelValue))
+			}
+		} else {
+			utils.AddLabel(obj, monLabelKey, monLabelValue)
+		}
 		if err := r.update(obj); err != nil {
 			return err
 		}

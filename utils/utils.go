@@ -67,6 +67,12 @@ func AddLabel(obj metav1.Object, key string, value string) {
 	labels[key] = value
 }
 
+// RemoveLabel removes a label from the resource metadata.
+func RemoveLabel(obj metav1.Object, key string) {
+	labels := obj.GetLabels()
+	delete(labels, key)
+}
+
 // GetRegexMatcher converts list of alerts to regex matcher.
 func GetRegexMatcher(alerts []string) string {
 	return "^" + strings.Join(alerts, "$|^") + "$"
