@@ -18,6 +18,13 @@ RUN INSTALL_PKGS="python38 python38-devel python38-setuptools python38-pip \
     https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
     mv kubectl /bin/kubectl
 
+# Install nodejs@15 (for cypress)
+RUN curl -sL https://rpm.nodesource.com/setup_15.x | bash - && \
+    yum install -y nodejs && \
+    node --version && \
+    npm --version && \
+    npm i -g cypress
+
 # Points to my branch, will replace after triggering a rehearsal on openshift/release and testing.
 ARG ADDON_TEST_FILE="harness.bash"
 ADD https://raw.githubusercontent.com/rexagod/mcg-osd-deployer/add-harness/hack/harness/harness.bash /
