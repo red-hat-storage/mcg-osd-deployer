@@ -75,14 +75,13 @@ done
 
 sleep 480
 
-echo "### Running run-ci."
-cd "${OCSCI_INSTALL_DIR}"
-source venv/bin/activate
-run-ci -m acceptance \
-  --cluster-name "$KUBE_CLUSTER_NAME" \
-  --cluster-path "$CLUSTER_DIR" \
-  --ocsci-conf "$CLUSTER_CONFIG" \
-  --junit-xml "$JUNIT_XML"
+# Run Cypress tests.
+git clone https://github.com/red-hat-storage/mcg-ms-console
+cd mcg-ms-console
+yarn install --production=false
+yarn run test-cypress-headless
+yarn run cypress-postreport
+cat cypress-gen/*.xml > out.xml
 
 # Remove testsuites tag from junit xml
 sed -i 's/<testsuites>\|<\/testsuites>//g' $JUNIT_XML

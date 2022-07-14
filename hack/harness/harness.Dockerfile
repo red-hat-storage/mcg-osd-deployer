@@ -23,7 +23,7 @@ RUN curl -sL https://rpm.nodesource.com/setup_15.x | bash - && \
     yum install -y nodejs && \
     node --version && \
     npm --version && \
-    npm i -g cypress
+    npm i -g cypress yarn
 
 # Points to my branch, will replace after triggering a rehearsal on openshift/release and testing.
 ARG ADDON_TEST_FILE="harness.bash"
