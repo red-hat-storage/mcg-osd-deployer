@@ -4,52 +4,52 @@
        - expr: |
            NooBaa_num_buckets_claims{namespace="redhat-data-federation"}
          labels:
-           origin: mcg-osd-deployer
+           origin: data-federation-service
          record: noobaa_num_buckets_claims
        - expr: |
            NooBaa_num_unhealthy_bucket_claims{namespace="redhat-data-federation"}
          labels:
-           origin: mcg-osd-deployer
+           origin: data-federation-service
          record: noobaa_num_unhealthy_bucket_claims
        - expr: |
            NooBaa_num_unhealthy_namespace_buckets{namespace="redhat-data-federation"}
          labels:
-           origin: mcg-osd-deployer
+           origin: data-federation-service
          record: job:noobaa_total_unhealthy_namespace_buckets
        - expr: |
            NooBaa_num_namespace_buckets{namespace="redhat-data-federation"}
          labels:
-           origin: mcg-osd-deployer
+           origin: data-federation-service
          record: job:noobaa_namespace_bucket_count
        - expr: |
            NooBaa_accounts_num{namespace="redhat-data-federation"}
          labels:
-           origin: mcg-osd-deployer
+           origin: data-federation-service
          record: noobaa_accounts_num
        - expr: |
            NooBaa_total_usage{namespace="redhat-data-federation"}
          labels:
-           origin: mcg-osd-deployer
+           origin: data-federation-service
          record: noobaa_total_usage
        - expr: |
             NooBaa_num_unhealthy_namespace_resources{namespace="redhat-data-federation"}
          labels:
-           origin: mcg-osd-deployer
+           origin: data-federation-service
          record: noobaa_num_unhealthy_namespace_resources
        - expr: |
            NooBaa_num_namespace_resources{namespace="redhat-data-federation"}
          labels:
-           origin: mcg-osd-deployer
+           origin: data-federation-service
          record: nooBaa_num_namespace_resources
        - expr: |
            NooBaa_namespace_resource_status{namespace="redhat-data-federation"}
          labels:
-           origin: mcg-osd-deployer
+           origin: data-federation-service
          record: noobaa_namespace_resource_status
        - expr: |
            NooBaa_namespace_bucket_status{namespace="redhat-data-federation"}
          labels:
-           origin: mcg-osd-deployer
+           origin: data-federation-service
          record: noobaa_namespace_bucket_status
    - name: noobaa-internal.rules
      rules:
@@ -58,7 +58,7 @@
          labels:
            system_type: NooBaa
            system_vendor: Red Hat
-           origin: mcg-osd-deployer
+           origin: data-federation-service
          record: noobaa_system_health_status
    - name: bucket-state-alert.rules
      rules:
@@ -74,7 +74,7 @@
          for: 5m
          labels:
            severity: warning
-           origin: mcg-osd-deployer
+           origin: data-federation-service
    - name: resource-state-alert.rules
      rules:
        - alert: CacheBucketErrorState
@@ -89,7 +89,7 @@
          for: 5m
          labels:
            severity: warning
-           origin: mcg-osd-deployer
+           origin: data-federation-service
        - alert: DataSourceErrorState
          annotations:
            description: A Data Source {{ $labels.namespace_resource_name
@@ -102,4 +102,4 @@
          for: 5m
          labels:
            severity: warning
-           origin: mcg-osd-deployer
+           origin: data-federation-service
