@@ -960,7 +960,6 @@ func (r *ManagedMCGReconciler) reconcileConsoleCluster() error {
 
 func (r *ManagedMCGReconciler) ensureConsolePlugin() error {
 	clusterVersion, err := r.determineOpenShiftVersion()
-
 	if err != nil {
 		return fmt.Errorf("failed to get the cluster version, %w", err)
 	}
