@@ -36,26 +36,16 @@ func convertToAPIExtV1JSON(val interface{}) apiextensionsv1.JSON {
 var _false = false
 
 var pagerdutyAlerts = []string{
-	"NooBaaResourceErrorState",
-	"NooBaaNamespaceResourceErrorState",
-	"NooBaaBucketErrorState",
-	"NooBaaNamespaceBucketErrorState",
+	"DataSourceErrorState",
+	"BucketPolicyErrorState",
+	"CacheBucketErrorState",
 }
 
 var smtpAlerts = []string{
-	"NooBaaBucketReachingQuotaState",
-	"NooBaaBucketExceedingQuotaState",
-	"NooBaaBucketLowCapacityState",
-	"NooBaaBucketNoCapacityState",
-	"NooBaaSystemCapacityWarning85",
-	"NooBaaSystemCapacityWarning95",
-	"NooBaaSystemCapacityWarning100",
+	"DataSourceErrorState",
+	"BucketPolicyErrorState",
 }
 
-/* List of silenced alerts:
-- CephOSDCriticallyFull
-- CephOSDNearFull
-*/
 // OSD Full alerts are silenced as there is no scenario in our static deployment configuration where an OSD is getting
 // full without the cluster getting full.
 
