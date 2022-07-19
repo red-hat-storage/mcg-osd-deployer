@@ -1,0 +1,105 @@
+ groups:
+   - name: noobaa-telemeter.rules
+     rules:
+       - expr: |
+           NooBaa_num_buckets_claims{namespace="redhat-data-federation"}
+         labels:
+           origin: data-federation-service
+         record: noobaa_num_buckets_claims
+       - expr: |
+           NooBaa_num_unhealthy_bucket_claims{namespace="redhat-data-federation"}
+         labels:
+           origin: data-federation-service
+         record: noobaa_num_unhealthy_bucket_claims
+       - expr: |
+           NooBaa_num_unhealthy_namespace_buckets{namespace="redhat-data-federation"}
+         labels:
+           origin: data-federation-service
+         record: job:noobaa_total_unhealthy_namespace_buckets
+       - expr: |
+           NooBaa_num_namespace_buckets{namespace="redhat-data-federation"}
+         labels:
+           origin: data-federation-service
+         record: job:noobaa_namespace_bucket_count
+       - expr: |
+           NooBaa_accounts_num{namespace="redhat-data-federation"}
+         labels:
+           origin: data-federation-service
+         record: noobaa_accounts_num
+       - expr: |
+           NooBaa_total_usage{namespace="redhat-data-federation"}
+         labels:
+           origin: data-federation-service
+         record: noobaa_total_usage
+       - expr: |
+            NooBaa_num_unhealthy_namespace_resources{namespace="redhat-data-federation"}
+         labels:
+           origin: data-federation-service
+         record: noobaa_num_unhealthy_namespace_resources
+       - expr: |
+           NooBaa_num_namespace_resources{namespace="redhat-data-federation"}
+         labels:
+           origin: data-federation-service
+         record: nooBaa_num_namespace_resources
+       - expr: |
+           NooBaa_namespace_resource_status{namespace="redhat-data-federation"}
+         labels:
+           origin: data-federation-service
+         record: noobaa_namespace_resource_status
+       - expr: |
+           NooBaa_namespace_bucket_status{namespace="redhat-data-federation"}
+         labels:
+           origin: data-federation-service
+         record: noobaa_namespace_bucket_status
+   - name: noobaa-internal.rules
+     rules:
+       - expr: |
+           NooBaa_odf_health_status{namespace="redhat-data-federation"}
+         labels:
+           system_type: NooBaa
+           system_vendor: Red Hat
+           origin: data-federation-service
+         record: noobaa_system_health_status
+   - name: bucket-state-alert.rules
+     rules:
+       - alert: BucketPolicyErrorState
+         annotations:
+           description: A Bucket Policy {{ $labels.bucket_name }} is in error
+             state for more than 5m
+           message: A Bucket Policy Is In Error State
+           severity_level: warning
+           storage_type: NooBaa
+         expr: |
+           NooBaa_namespace_bucket_status{bucket_name=~".*"} == 0
+         for: 5m
+         labels:
+           severity: warning
+           origin: data-federation-service
+   - name: resource-state-alert.rules
+     rules:
+       - alert: CacheBucketErrorState
+         annotations:
+           description: The Cache Bucket {{ $labels.resource_name }} is in error state
+             for more than 5m
+           message: The Cache Bucket Is In Error State
+           severity_level: warning
+           storage_type: NooBaa
+         expr: |
+           NooBaa_resource_status{resource_name=~"noobaa-default-backing-store"} == 0
+         for: 5m
+         labels:
+           severity: warning
+           origin: data-federation-service
+       - alert: DataSourceErrorState
+         annotations:
+           description: A Data Source {{ $labels.namespace_resource_name
+             }} is in error state for more than 5m
+           message: A Data Source Is In Error State
+           severity_level: warning
+           storage_type: NooBaa
+         expr: |
+           NooBaa_namespace_resource_status{namespace_resource_name=~".*"} == 0
+         for: 5m
+         labels:
+           severity: warning
+           origin: data-federation-service

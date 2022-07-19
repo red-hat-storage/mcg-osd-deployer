@@ -107,6 +107,7 @@ type ManagedMCGReconciler struct {
 	addonParams                  map[string]string
 	alertmanager                 *promv1.Alertmanager
 	dmsRule                      *promv1.PrometheusRule
+	noobaaRules                  *promv1.PrometheusRule
 	prometheusProxyNetworkPolicy *netv1.NetworkPolicy
 	kubeRBACConfigMap            *v1.ConfigMap
 	prometheusService            *v1.Service
@@ -960,7 +961,6 @@ func (r *ManagedMCGReconciler) reconcileConsoleCluster() error {
 
 func (r *ManagedMCGReconciler) ensureConsolePlugin() error {
 	clusterVersion, err := r.determineOpenShiftVersion()
-
 	if err != nil {
 		return fmt.Errorf("failed to get the cluster version, %w", err)
 	}
