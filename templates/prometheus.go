@@ -18,12 +18,15 @@ package templates
 
 import (
 	"fmt"
+	"strings"
 
-	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	"github.com/red-hat-storage/mcg-osd-deployer/utils"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+
+	"github.com/red-hat-storage/mcg-osd-deployer/utils"
 )
 
 var (
@@ -37,6 +40,21 @@ var resourceSelector = metav1.LabelSelector{
 	MatchLabels: map[string]string{
 		"app": "managed-mcg",
 	},
+}
+
+var metrics = []string{
+	"namespace:noobaa_unhealthy_bucket_claims:max",
+	"namespace:noobaa_buckets_claims:max",
+	"namespace:noobaa_unhealthy_namespace_resources:max",
+	"namespace:noobaa_namespace_resources:max",
+	"namespace:noobaa_unhealthy_namespace_buckets:max",
+	"namespace:noobaa_namespace_buckets:max",
+	"namespace:noobaa_accounts:max",
+	"namespace:noobaa_usage:max",
+	"namespace:noobaa_system_health_status:max",
+	"BucketPolicyErrorState",
+	"CacheBucketErrorState",
+	"DataSourceErrorState",
 }
 
 var PrometheusTemplate = promv1.Prometheus{
@@ -95,6 +113,28 @@ var PrometheusTemplate = promv1.Prometheus{
 				},
 				Resources: utils.GetResourceRequirements("kube-rbac-proxy"),
 			}},
+			RemoteWrite: []promv1.RemoteWriteSpec{
+				{
+					OAuth2: &promv1.OAuth2{
+						ClientSecret: corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{},
+						},
+						ClientID: promv1.SecretOrConfigMap{
+							Secret: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{},
+							},
+						},
+						EndpointParams: map[string]string{},
+					},
+					WriteRelabelConfigs: []promv1.RelabelConfig{
+						{
+							SourceLabels: []promv1.LabelName{"__name__"},
+							Regex:        strings.Join(metrics, "|"),
+							Action:       "keep",
+						},
+					},
+				},
+			},
 		},
 		RuleSelector: &resourceSelector,
 		Alerting: &promv1.AlertingSpec{

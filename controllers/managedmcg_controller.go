@@ -25,6 +25,14 @@ import (
 
 	noobaav1alpha1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	netv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
 	openshiftv1 "github.com/openshift/api/network/v1"
@@ -36,13 +44,6 @@ import (
 	"github.com/red-hat-storage/mcg-osd-deployer/console"
 	"github.com/red-hat-storage/mcg-osd-deployer/templates"
 	"github.com/red-hat-storage/mcg-osd-deployer/utils"
-	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
-	netv1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -58,16 +59,18 @@ const (
 	ManagedMCGFinalizer = "managedmcg.openshift.io"
 	ManagedMCGName      = "managedmcg"
 
-	deployerCSVPrefix                = "mcg-osd-deployer"
-	noobaaFinalizer                  = "noobaa.io/graceful_finalizer"
-	noobaaName                       = "noobaa"
-	prometheusProxyNetworkPolicyName = "prometheus-proxy-rule"
-	prometheusServiceName            = "prometheus"
-	egressNetworkPolicyName          = "egress-rule"
-	ingressNetworkPolicyName         = "ingress-rule"
-	ObjectBucketClaimFinalizer       = "objectbucket.io/finalizer"
-	mcgmsConsoleName                 = "mcg-ms-console"
-	operatorConsoleName              = "cluster"
+	deployerCSVPrefix                 = "mcg-osd-deployer"
+	noobaaFinalizer                   = "noobaa.io/graceful_finalizer"
+	noobaaName                        = "noobaa"
+	prometheusProxyNetworkPolicyName  = "prometheus-proxy-rule"
+	prometheusServiceName             = "prometheus"
+	egressNetworkPolicyName           = "egress-rule"
+	ingressNetworkPolicyName          = "ingress-rule"
+	ObjectBucketClaimFinalizer        = "objectbucket.io/finalizer"
+	mcgmsConsoleName                  = "mcg-ms-console"
+	operatorConsoleName               = "cluster"
+	rhobsRemoteWriteConfigIDSecretKey = "prom-remote-write-config-id"
+	rhobsRemoteWriteConfigSecretName  = "prom-remote-write-config-secret"
 )
 
 type ImageMap struct {
@@ -89,6 +92,11 @@ type ManagedMCGReconciler struct {
 	AlertSMTPFrom                string
 	ConsolePort                  int
 	PagerdutySecretName          string
+	RHOBSSecretName              string
+	RHOBSEndpoint                string
+	RHSSOTokenEndpoint           string
+	AddonVariant                 string
+	AddonEnvironment             string
 
 	objectBucketClaim            *noobaav1alpha1.ObjectBucketClaim
 	bucketClass                  *noobaav1alpha1.BucketClass
@@ -111,6 +119,7 @@ type ManagedMCGReconciler struct {
 	prometheusProxyNetworkPolicy *netv1.NetworkPolicy
 	kubeRBACConfigMap            *v1.ConfigMap
 	prometheusService            *v1.Service
+	rhobsRemoteWriteConfigSecret *v1.Secret
 
 	namespaceStore          *noobaav1alpha1.NamespaceStore
 	backingStore            *noobaav1alpha1.BackingStore
@@ -773,7 +782,8 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return name == r.AddonParamSecretName ||
 					name == r.PagerdutySecretName ||
 					name == r.DeadMansSnitchSecretName ||
-					name == r.SMTPSecretName
+					name == r.SMTPSecretName ||
+					name == r.RHOBSSecretName
 			},
 		),
 	)
