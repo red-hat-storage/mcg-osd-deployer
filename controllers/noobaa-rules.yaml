@@ -40,7 +40,7 @@
            NooBaa_num_namespace_resources{namespace="redhat-data-federation"}
          labels:
            origin: data-federation-service
-         record: nooBaa_num_namespace_resources
+         record: noobaa_num_namespace_resources
        - expr: |
            NooBaa_namespace_resource_status{namespace="redhat-data-federation"}
          labels:
