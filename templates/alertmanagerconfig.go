@@ -36,14 +36,12 @@ func convertToAPIExtV1JSON(val interface{}) apiextensionsv1.JSON {
 var _false = false
 
 var pagerdutyAlerts = []string{
-	"DataSourceErrorState",
-	"BucketPolicyErrorState",
-	"CacheBucketErrorState",
+	"NooBaaCacheBucketErrorState",
 }
 
 var smtpAlerts = []string{
-	"DataSourceErrorState",
-	"BucketPolicyErrorState",
+	"NooBaaDataSourceErrorState",
+	"NooBaaBucketPolicyErrorState",
 }
 
 // OSD Full alerts are silenced as there is no scenario in our static deployment configuration where an OSD is getting
