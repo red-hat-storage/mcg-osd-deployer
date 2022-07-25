@@ -282,6 +282,16 @@ func (r *ManagedMCGReconciler) reconcileResources() error {
 	if err := r.reconcileNoobaaComponent(); err != nil {
 		return err
 	}
+	if err := r.ensureConsolePlugin(); err != nil {
+		return err
+	}
+
+	if err := r.reconcileConsoleCluster(); err != nil {
+		return err
+	}
+	if err := r.reconcileOCSCSV(); err != nil {
+		return err
+	}
 	if err := r.reconcileKubeRBACConfigMap(); err != nil {
 		return err
 	}
@@ -294,18 +304,6 @@ func (r *ManagedMCGReconciler) reconcileResources() error {
 	if err := r.reconcileAlertMonitoring(); err != nil {
 		return err
 	}
-	if err := r.reconcileOCSCSV(); err != nil {
-		return err
-	}
-
-	if err := r.ensureConsolePlugin(); err != nil {
-		return err
-	}
-
-	if err := r.reconcileConsoleCluster(); err != nil {
-		return err
-	}
-
 	if err := r.reconcileEgressNetworkPolicy(); err != nil {
 		return err
 	}
