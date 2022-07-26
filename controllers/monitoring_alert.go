@@ -22,18 +22,21 @@ import (
 	"io/ioutil"
 	"strings"
 
-	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	netv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+
+	"gopkg.in/yaml.v2"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
 
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	promv1a1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/red-hat-storage/mcg-osd-deployer/templates"
 	"github.com/red-hat-storage/mcg-osd-deployer/utils"
-	"gopkg.in/yaml.v2"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -101,6 +104,10 @@ func (r *ManagedMCGReconciler) initializePrometheusReconciler() {
 	r.kubeRBACConfigMap = &corev1.ConfigMap{}
 	r.kubeRBACConfigMap.Name = templates.PrometheusKubeRBACPoxyConfigMapName
 	r.kubeRBACConfigMap.Namespace = r.namespace
+
+	r.rhobsRemoteWriteConfigSecret = &corev1.Secret{}
+	r.rhobsRemoteWriteConfigSecret.Name = r.RHOBSSecretName
+	r.rhobsRemoteWriteConfigSecret.Namespace = r.namespace
 }
 
 func (r *ManagedMCGReconciler) reconcileAlertMonitoring() error {
@@ -501,6 +508,10 @@ func (r *ManagedMCGReconciler) reconcilePrometheus() error {
 			Key: alertRelabelConfigSecretKey,
 		}
 
+		if err := r.configureRHOBSRemoteWrite(); err != nil {
+			return err
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -525,6 +536,39 @@ func (r *ManagedMCGReconciler) reconcilePrometheusProxyNetworkPolicy() error {
 	if err != nil {
 		return fmt.Errorf("failed to update prometheus proxy NetworkPolicy: %w", err)
 	}
+
+	return nil
+}
+
+func (r *ManagedMCGReconciler) configureRHOBSRemoteWrite() error {
+	if err := r.get(r.rhobsRemoteWriteConfigSecret); err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+	if r.rhobsRemoteWriteConfigSecret.UID == "" {
+		r.prometheus.Spec.RemoteWrite = nil
+		r.Log.Info("RHOBS remote write config secret not found, disabling remote write")
+
+		return nil
+	}
+	rhobsSecretData := r.rhobsRemoteWriteConfigSecret.Data
+	if _, found := rhobsSecretData[rhobsRemoteWriteConfigIDSecretKey]; !found {
+		return fmt.Errorf("rhobs secret does not contain a value for key %v", rhobsRemoteWriteConfigIDSecretKey)
+	}
+	if _, found := rhobsSecretData[rhobsRemoteWriteConfigSecretName]; !found {
+		return fmt.Errorf("rhobs secret does not contain a value for key %v", rhobsRemoteWriteConfigSecretName)
+	}
+	rhobsAudience, found := rhobsSecretData["rhobs-audience"]
+	if !found {
+		return fmt.Errorf("rhobs secret does not contain a value for key rhobs-audience")
+	}
+	remoteWriteSpec := &r.prometheus.Spec.RemoteWrite[0]
+	remoteWriteSpec.URL = r.RHOBSEndpoint
+	remoteWriteSpec.OAuth2.ClientID.Secret.LocalObjectReference.Name = r.RHOBSSecretName
+	remoteWriteSpec.OAuth2.ClientID.Secret.Key = rhobsRemoteWriteConfigIDSecretKey
+	remoteWriteSpec.OAuth2.ClientSecret.LocalObjectReference.Name = r.RHOBSSecretName
+	remoteWriteSpec.OAuth2.ClientSecret.Key = rhobsRemoteWriteConfigSecretName
+	remoteWriteSpec.OAuth2.TokenURL = r.RHSSOTokenEndpoint
+	remoteWriteSpec.OAuth2.EndpointParams["audience"] = string(rhobsAudience)
 
 	return nil
 }

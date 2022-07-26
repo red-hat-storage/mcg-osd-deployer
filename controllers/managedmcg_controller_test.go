@@ -21,17 +21,22 @@ import (
 	"os"
 	"testing"
 
+	appsv1 "k8s.io/api/apps/v1"
+	netv1 "k8s.io/api/networking/v1"
+
 	obv1 "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	noobaav1alpha1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	consolev1 "github.com/openshift/api/console/v1"
 	consolev1alpha1 "github.com/openshift/api/console/v1alpha1"
-	appsv1 "k8s.io/api/apps/v1"
-	netv1 "k8s.io/api/networking/v1"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
 	noobaa "github.com/noobaa/noobaa-operator/v5/pkg/apis"
 	openshiftv1 "github.com/openshift/api/network/v1"
@@ -40,9 +45,6 @@ import (
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	promv1a1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	mcgv1alpha1 "github.com/red-hat-storage/mcg-osd-deployer/api/v1alpha1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -154,6 +156,21 @@ func newSMTPSecretFake() corev1.Secret {
 	return secretFake
 }
 
+func newRHOBSSecretFake() corev1.Secret {
+	secretFake := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "RHOBSSecretfake",
+			Namespace: namespace,
+		},
+	}
+	secretFake.Data = make(map[string][]byte, 1)
+	secretFake.Data["prom-remote-write-config-id"] = []byte("test")
+	secretFake.Data["prom-remote-write-config-secret"] = []byte("test")
+	secretFake.Data["rhobs-audience"] = []byte("test")
+
+	return secretFake
+}
+
 func newOcsCsvFake() opv1a1.ClusterServiceVersion {
 	ocscsv := opv1a1.ClusterServiceVersion{
 		ObjectMeta: metav1.ObjectMeta{
@@ -243,6 +260,7 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 	smtpsecretfake := newSMTPSecretFake()
 	pagerdutysecretFake := newPagerDutySecretFake()
 	deadmansercretFake := newDeadMansSecretFake()
+	rhobsSecretFake := newRHOBSSecretFake()
 	consoleDepFake := newConsoleDeploymentFake()
 	mcgcsvFake := newMcgCsvFake()
 	egressNetworkPolicy := newEgressNetworkPolicy()
@@ -253,6 +271,7 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 	r.DeadMansSnitchSecretName = "DeadMansSecretfake"
 	r.PagerdutySecretName = "PagerDutySecretfake"
 	r.SMTPSecretName = "SmtpSecretfake"
+	r.RHOBSSecretName = "RHOBSSecretfake"
 	r.CustomerNotificationHTMLPath = CustomerNotificationHTMLPath
 	r.ConsolePort = 24007
 
@@ -263,7 +282,7 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 	}
 
 	fakeClient := fake.NewClientBuilder().WithScheme(r.Scheme).WithObjects(&ocscsvFake,
-		&smtpsecretfake, &addonsecretFake, &deadmansercretFake, &pagerdutysecretFake,
+		&smtpsecretfake, &addonsecretFake, &deadmansercretFake, &pagerdutysecretFake, &rhobsSecretFake,
 		&managedMCGFake, &consoleDepFake, &mcgcsvFake, &egressNetworkPolicy, &ingressNetworkPolicy,
 		&newFakeBucketClass).Build()
 
