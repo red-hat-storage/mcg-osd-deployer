@@ -22,6 +22,8 @@ import (
 	"io/ioutil"
 	"strings"
 
+	configv1 "github.com/openshift/api/config/v1"
+
 	netv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -172,6 +174,38 @@ func (r *ManagedMCGReconciler) reconcileNoobaaRules() error {
 		}
 		if err := k8syaml.Unmarshal(noobaaRulesSpec, &r.noobaaRules.Spec); err != nil {
 			return fmt.Errorf("failed to unmarshal noobaa-rules.yaml: %w", err)
+		}
+
+		// addLabel is a helper function to add a particular label to all rules in the PrometheusRuleSpec.
+		addLabel := func(label, value string) {
+			r.Log.Info("Adding label", "label", label, "value", value)
+			group := &r.noobaaRules.Spec.Groups
+			for i := range *group {
+				rules := &(*group)[i].Rules
+				for j := range *rules {
+					if (*rules)[j].Labels == nil {
+						(*rules)[j].Labels = make(map[string]string)
+					}
+					(*rules)[j].Labels[label] = value
+				}
+			}
+		}
+
+		// append variant and env labels to noobaa rules
+		addLabel("variant", r.AddonVariant)
+		addLabel("environment", r.AddonEnvironment)
+
+		// append cluster id to the noobaa rules
+		clusterVersionList := configv1.ClusterVersionList{}
+		if err := r.Client.List(r.ctx, &clusterVersionList); err != nil {
+			return fmt.Errorf("failed to get the clusterversion, %w", err)
+		}
+		for _, cv := range clusterVersionList.Items {
+			if cv.Name == "version" {
+				addLabel("cluster_id", string(cv.Spec.ClusterID))
+
+				break
+			}
 		}
 
 		return nil
