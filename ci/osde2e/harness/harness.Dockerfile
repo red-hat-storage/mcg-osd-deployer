@@ -16,6 +16,7 @@ RUN INSTALL_PKGS="python38 python38-devel python38-setuptools python38-pip \
     rm -rf /var/cache/yum && \
     curl -LO "https://dl.k8s.io/release/$(curl -L -s \
     https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
+    chmod +x kubectl && \
     mv kubectl /bin/kubectl
 
 # Install nodejs@15 (for cypress)
