@@ -201,7 +201,7 @@ spec:
                 app: mcg-ms-console
             spec:
               containers:
-              - image: quay.io/skatiyar/mcg-ms-console:latest
+              - image: quay.io/osd-addons/mcg-ms-console-dev:latest
                 name: mcg-ms-console
                 ports:
                 - containerPort: 9002
