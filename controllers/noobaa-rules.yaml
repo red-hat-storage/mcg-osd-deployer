@@ -44,11 +44,6 @@
          labels:
            origin: data-federation-service
          record: namespace:noobaa_namespace_buckets:max
-       - expr: |
-           count(NooBaa_namespace_bucket_status{namespace="redhat-data-federation"} == 0)
-         labels:
-           origin: data-federation-service
-         record: namespace:unhealthy_noobaa_namespace_buckets:count
    - name: noobaa-internal.rules
      rules:
        - expr: |
