@@ -1,5 +1,8 @@
 #!/bin/sh
 
+PROJECT_ROOT=$(realpath "$(dirname "$0")"/../../)
+GOLANGCI_LINT_PATH="$PROJECT_ROOT/hack/hooks/golangci-lint"
+
 # Check if go is installed
 if ! command -v go >/dev/null 2>&1; then
   echo "go is not installed"
@@ -13,16 +16,6 @@ if [ -z "$(go env GOBIN)" ]; then
   export GOBIN
 fi
 
-# Check if golangci-lint binary is available
-if ! command -v golangci-lint > /dev/null; then
-  echo "golangci-lint is not installed, installing..."
-  # Fetch golangci-lint binary
-  curl -JL \
-  https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
-    sh -s -- -b "$(go env GOBIN)" v1.46.2
-  chmod +x "$(go env GOBIN)"/golangci-lint
-fi
-
 echo "[Running golangci-lint]"
-PROJECT_ROOT=$(realpath "$(dirname "$0")"/../../)
-golangci-lint -c "$PROJECT_ROOT"/.golangci.yaml run "$PROJECT_ROOT"/...
+${GOLANGCI_LINT_PATH} -c "$PROJECT_ROOT"/.golangci.yaml run "$PROJECT_ROOT"/...
+
