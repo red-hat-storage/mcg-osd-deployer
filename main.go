@@ -29,11 +29,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+
+	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -64,6 +65,10 @@ const (
 	addonNameKey         = "ADDON_NAME"
 	sopEndpointKey       = "SOP_ENDPOINT"
 	alertSMTPFromAddrKey = "ALERT_SMTP_FROM_ADDR"
+	rhobsEndpoint        = "RHOBS_ENDPOINT"
+	rhssoTokenEndpoint   = "RH_SSO_TOKEN_ENDPOINT"
+	addonVariant         = "ADDON_VARIANT"     // qe, dev, production
+	addonEnvironment     = "ADDON_ENVIRONMENT" // stage, production
 )
 
 func init() {
@@ -129,6 +134,11 @@ func main() {
 		ConsolePort:                  9002,
 		AlertSMTPFrom:                envMap[alertSMTPFromAddrKey],
 		CustomerNotificationHTMLPath: "templates/customernotification.html",
+		RHOBSSecretName:              fmt.Sprintf("%v-prom-remote-write", addonName),
+		RHOBSEndpoint:                envMap[rhobsEndpoint],
+		RHSSOTokenEndpoint:           envMap[rhssoTokenEndpoint],
+		AddonEnvironment:             envMap[addonEnvironment],
+		AddonVariant:                 envMap[addonVariant],
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ManagedMCG")
 		os.Exit(1)
@@ -151,6 +161,10 @@ func setupEnvMap() (map[string]string, error) {
 		addonNameKey:         "",
 		sopEndpointKey:       "",
 		alertSMTPFromAddrKey: "",
+		rhobsEndpoint:        "",
+		rhssoTokenEndpoint:   "",
+		addonVariant:         "",
+		addonEnvironment:     "",
 	}
 	for key := range envMap {
 		value, found := os.LookupEnv(key)
