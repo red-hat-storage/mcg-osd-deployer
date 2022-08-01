@@ -26,7 +26,8 @@ func isReady(client client.Client, managedMCGResource types.NamespacedName, log 
 	}
 	ready := managedMCG.Status.Components.Noobaa.State == v1.ComponentReady &&
 		managedMCG.Status.Components.Prometheus.State == v1.ComponentReady &&
-		managedMCG.Status.Components.Alertmanager.State == v1.ComponentReady
+		managedMCG.Status.Components.Alertmanager.State == v1.ComponentReady &&
+		managedMCG.Status.Components.Console.State == v1.ComponentReady
 
 	return ready, nil
 }
