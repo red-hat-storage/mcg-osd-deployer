@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	noobaav1alpha1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 
@@ -32,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
@@ -436,6 +438,22 @@ func (r *ManagedMCGReconciler) removeNoobaa() error {
 			return fmt.Errorf("failed to delete bucketClasses: %w", err)
 		}
 	}
+	timeout := 10 * time.Second
+	interval := 2 * time.Second
+	pollBucketClasses := &noobaav1alpha1.BucketClassList{}
+	err := utilwait.PollImmediate(interval, timeout, func() (done bool, err error) {
+		if err := r.list(pollBucketClasses); err != nil {
+			return false, err
+		}
+		if len(pollBucketClasses.Items) > 0 {
+			return false, err
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get BucketClassList : %w", err)
+	}
 
 	r.noobaa.SetFinalizers(utils.Remove(r.noobaa.GetFinalizers(), noobaaFinalizer))
 	if err := r.Client.Update(r.ctx, r.noobaa); err != nil {
@@ -457,20 +475,6 @@ func (r *ManagedMCGReconciler) removeNoobaa() error {
 		}
 	}
 
-	objectBucketClaims := &noobaav1alpha1.ObjectBucketClaimList{}
-	if err := r.list(objectBucketClaims); err != nil {
-		return fmt.Errorf("failed to get the objectBucketClaims : %w", err)
-	}
-	for _, objectBucketClaim := range objectBucketClaims.Items {
-		r.noobaaObjectBucketClaim = objectBucketClaim.DeepCopy()
-		r.noobaaObjectBucketClaim.SetFinalizers(
-			utils.Remove(r.noobaaObjectBucketClaim.GetFinalizers(), ObjectBucketClaimFinalizer))
-		if err := r.Client.Update(r.ctx, r.noobaaObjectBucketClaim); err != nil {
-			return fmt.Errorf("failed to remove objectBucketClaims finalizer: %w", err)
-		}
-		r.deleteOBCResources(r.noobaaObjectBucketClaim.Name)
-	}
-
 	namespaceStores := &noobaav1alpha1.NamespaceStoreList{}
 	if err := r.list(namespaceStores); err != nil {
 		return fmt.Errorf("failed to get the namespaceStores: %w", err)
@@ -484,40 +488,6 @@ func (r *ManagedMCGReconciler) removeNoobaa() error {
 	}
 
 	return nil
-}
-
-func (r *ManagedMCGReconciler) deleteOBCResources(obcName string) {
-	configMap := &v1.ConfigMap{}
-	secret := &v1.Secret{}
-	configMap.Name = obcName
-	configMap.Namespace = r.namespace
-	err := r.get(configMap)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			r.Log.Error(err, "Unable to get  OBC configmap")
-		}
-	}
-
-	configMap.SetFinalizers(
-		utils.Remove(configMap.GetFinalizers(), ObjectBucketClaimFinalizer))
-	if err := r.Client.Update(r.ctx, configMap); err != nil {
-		r.Log.Error(err, "failed to remove objectBucketClaims configMap finalizer")
-	}
-	secret.Name = obcName
-	secret.Namespace = r.namespace
-
-	err = r.get(secret)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			r.Log.Error(err, "Unable to get  OBC secret")
-		}
-	}
-	secret.SetFinalizers(
-		utils.Remove(secret.GetFinalizers(), ObjectBucketClaimFinalizer))
-	if err := r.Client.Update(r.ctx, secret); err != nil {
-		r.Log.Error(err, "failed to remove objectBucketClaims secret finalizer")
-	}
-	r.Log.Info("OBC resources deleted")
 }
 
 func (r *ManagedMCGReconciler) updateAddonParams() error {
@@ -803,6 +773,9 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return true
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
+			if e.Object.GetName() == "noobaa-default-bucket-class" {
+				return true
+			}
 			r.bucketClassDeleted(e.Object)
 
 			return true

@@ -161,6 +161,8 @@ func (r *ManagedMCGReconciler) bucketClassDeleted(object client.Object) {
 	err := r.delete(&objectBucketClaim)
 	if err != nil {
 		r.Log.Error(err, "error deleting ObjectBucketClaim")
+
+		return
 	}
 	r.Log.Info("ObjectBucketClaim deleted", "name", objectBucketClaim.Name)
 }
