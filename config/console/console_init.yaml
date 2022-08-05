@@ -11,6 +11,9 @@ spec:
       labels:
         app: mcg-ms-console
     spec:
+      securityContext:
+        runAsNonRoot: true
+        allowPrivilegeEscalation: false
       containers:
         - name: mcg-ms-console
           image: mcg-ms-console:latest
