@@ -8,6 +8,9 @@ metadata:
 spec:
   template:
     spec:
+      securityContext:
+        runAsNonRoot: true
+        allowPrivilegeEscalation: false
       containers:
       - name: kube-rbac-proxy
         image: gcr.io/kubebuilder/kube-rbac-proxy:v0.11.0

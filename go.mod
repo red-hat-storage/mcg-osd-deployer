@@ -121,4 +121,5 @@ replace (
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.23.4
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.23.4
 	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.11.2
+	gopkg.in/yaml.v3 => gopkg.in/yaml.v3 v3.0.1
 )

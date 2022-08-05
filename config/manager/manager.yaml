@@ -24,6 +24,9 @@ spec:
       labels:
         control-plane: controller-manager
     spec:
+      securityContext:
+        runAsNonRoot: true
+        allowPrivilegeEscalation: false
       containers:
         - name: readiness-server
           command:

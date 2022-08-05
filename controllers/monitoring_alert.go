@@ -20,6 +20,7 @@ import (
 	_ "embed"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -362,7 +363,7 @@ func (r *ManagedMCGReconciler) configReceiver(dmsURL string, alertingAddressList
 			receiver.WebhookConfigs[0].URL = &dmsURL
 		case "SendGrid":
 			if len(alertingAddressList) > 0 {
-				receiver.EmailConfigs[0].Smarthost = fmt.Sprintf("%s:%s", r.smtpSecret.Data["host"], r.smtpSecret.Data["port"])
+				receiver.EmailConfigs[0].Smarthost = net.JoinHostPort(string(r.smtpSecret.Data["host"]), string(r.smtpSecret.Data["port"]))
 				receiver.EmailConfigs[0].AuthUsername = string(r.smtpSecret.Data["username"])
 				receiver.EmailConfigs[0].AuthPassword.LocalObjectReference.Name = r.SMTPSecretName
 				receiver.EmailConfigs[0].AuthPassword.Key = "password"
