@@ -52,6 +52,9 @@ var metrics = []string{
 	"namespace:noobaa_accounts:max",
 	"namespace:noobaa_usage:max",
 	"namespace:noobaa_system_health_status:max",
+}
+
+var alerts = []string{
 	"BucketPolicyErrorState",
 	"CacheBucketErrorState",
 	"DataSourceErrorState",
@@ -128,8 +131,8 @@ var PrometheusTemplate = promv1.Prometheus{
 					},
 					WriteRelabelConfigs: []promv1.RelabelConfig{
 						{
-							SourceLabels: []promv1.LabelName{"__name__"},
-							Regex:        strings.Join(metrics, "|"),
+							SourceLabels: []promv1.LabelName{"__name__", "alertname"},
+							Regex:        getRelabelRegex(alerts, metrics),
 							Action:       "keep",
 						},
 					},
@@ -146,4 +149,15 @@ var PrometheusTemplate = promv1.Prometheus{
 			},
 		},
 	},
+}
+
+func getRelabelRegex(alerts []string, metrics []string) string {
+	return fmt.Sprintf(
+		"(ALERTS;(%s))|%s",
+		strings.Join(alerts, "|"),
+		strings.Join(
+			utils.MapItems(metrics, func(str string) string { return fmt.Sprintf("(%s;)", str) }),
+			"|",
+		),
+	)
 }

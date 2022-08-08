@@ -14,9 +14,10 @@ package templates
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	promv1a1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	"github.com/red-hat-storage/mcg-osd-deployer/utils"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
@@ -59,8 +60,9 @@ var AlertmanagerConfigTemplate = promv1a1.AlertmanagerConfig{
 					RepeatInterval: "12h",
 					Matchers: []promv1a1.Matcher{
 						{
-							Name:  "alertname",
-							Value: utils.GetRegexMatcher(smtpAlerts), Regex: true,
+							Name:      "alertname",
+							Value:     getRegexMatcher(smtpAlerts),
+							MatchType: promv1a1.MatchRegexp,
 						},
 					},
 					Receiver: "SendGrid",
@@ -73,8 +75,9 @@ var AlertmanagerConfigTemplate = promv1a1.AlertmanagerConfig{
 					RepeatInterval: "12h",
 					Matchers: []promv1a1.Matcher{
 						{
-							Name:  "alertname",
-							Value: utils.GetRegexMatcher(pagerdutyAlerts), Regex: true,
+							Name:      "alertname",
+							Value:     getRegexMatcher(pagerdutyAlerts),
+							MatchType: promv1a1.MatchRegexp,
 						},
 					},
 					Receiver: "pagerduty",
@@ -85,8 +88,14 @@ var AlertmanagerConfigTemplate = promv1a1.AlertmanagerConfig{
 					GroupWait:      "30s",
 					GroupInterval:  "5m",
 					RepeatInterval: "5m",
-					Matchers:       []promv1a1.Matcher{{Name: "alertname", Value: "DeadMansSnitch"}},
-					Receiver:       "DeadMansSnitch",
+					Matchers: []promv1a1.Matcher{
+						{
+							Name:      "alertname",
+							Value:     "DeadMansSnitch",
+							MatchType: promv1a1.MatchEqual,
+						},
+					},
+					Receiver: "DeadMansSnitch",
 				},
 				),
 			},
@@ -123,4 +132,8 @@ var AlertmanagerConfigTemplate = promv1a1.AlertmanagerConfig{
 			},
 		},
 	},
+}
+
+func getRegexMatcher(alerts []string) string {
+	return fmt.Sprintf("^%s$", strings.Join(alerts, "$|^"))
 }
