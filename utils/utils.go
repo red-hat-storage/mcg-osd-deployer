@@ -18,7 +18,6 @@ package utils
 
 import (
 	"fmt"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,11 +72,6 @@ func RemoveLabel(obj metav1.Object, key string) {
 	delete(labels, key)
 }
 
-// GetRegexMatcher converts list of alerts to regex matcher.
-func GetRegexMatcher(alerts []string) string {
-	return "^" + strings.Join(alerts, "$|^") + "$"
-}
-
 func AddAnnotation(obj metav1.Object, key string, value string) {
 	annotations := obj.GetAnnotations()
 	if annotations == nil {
@@ -85,4 +79,13 @@ func AddAnnotation(obj metav1.Object, key string, value string) {
 		obj.SetAnnotations(annotations)
 	}
 	annotations[key] = value
+}
+
+func MapItems(source []string, transform func(string) string) []string {
+	target := make([]string, len(source))
+	for i := 0; i < len(source); i++ {
+		target[i] = transform(source[i])
+	}
+
+	return target
 }
