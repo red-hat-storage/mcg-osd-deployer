@@ -18,7 +18,7 @@ Data Federation is **not**:
 ### Contributing
 
 Thank you for your interest in contributing towards the project. Please refer to the [CONTRIBUTING.md](CONTRIBUTING.md)
-for more setting up your environment, and other helpful tips.
+for more information regarding setting up your environment, as well as other helpful tips.
 
 ### License
 
