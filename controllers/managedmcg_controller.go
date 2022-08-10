@@ -37,6 +37,7 @@ import (
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
+	consolev1alpha1 "github.com/openshift/api/console/v1alpha1"
 	openshiftv1 "github.com/openshift/api/network/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -109,6 +110,7 @@ type ManagedMCGReconciler struct {
 	noobaa                       *noobaav1alpha1.NooBaa
 	reconcileStrategy            mcgv1alpha1.ReconcileStrategy
 	prometheus                   *promv1.Prometheus
+	console                      *consolev1alpha1.ConsolePlugin
 	pagerdutySecret              *v1.Secret
 	deadMansSnitchSecret         *v1.Secret
 	smtpSecret                   *v1.Secret
@@ -158,6 +160,10 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 	r.noobaaObjectBucketClaim.Namespace = r.namespace
 	r.noobaaBucketClass = &noobaav1alpha1.BucketClass{}
 	r.noobaaBucketClass.Namespace = r.namespace
+
+	r.console = &consolev1alpha1.ConsolePlugin{}
+	r.console.Name = mcgmsConsoleName
+	r.console.Namespace = r.namespace
 
 	r.initializePrometheusReconciler()
 
@@ -521,7 +527,8 @@ func (r *ManagedMCGReconciler) areComponentsReadyForUninstall() bool {
 
 	return subComponents.Noobaa.State == mcgv1alpha1.ComponentReady &&
 		subComponents.Prometheus.State == mcgv1alpha1.ComponentReady &&
-		subComponents.Alertmanager.State == mcgv1alpha1.ComponentReady
+		subComponents.Alertmanager.State == mcgv1alpha1.ComponentReady &&
+		subComponents.Console.State == mcgv1alpha1.ComponentReady
 }
 
 // verifyAddonDeletionKey checks if the uninstallation condition is met
@@ -628,6 +635,16 @@ func (r *ManagedMCGReconciler) setNoobaaDesiredState(desiredNoobaa *noobaav1alph
 }
 
 func (r *ManagedMCGReconciler) updateComponentStatus() {
+	r.UpdateNoobaaComponentStatus()
+
+	r.UpdatePrometheusComponentStatus()
+
+	r.UpdateAlertmanagerComponentStatus()
+
+	r.UpdateConsoleComponentStatus()
+}
+
+func (r *ManagedMCGReconciler) UpdateNoobaaComponentStatus() {
 	r.Log.Info("updating Noobaa component status")
 	noobaaComponent := &r.managedMCG.Status.Components.Noobaa
 	switch err := r.get(r.noobaa); {
@@ -643,8 +660,11 @@ func (r *ManagedMCGReconciler) updateComponentStatus() {
 		r.Log.Info("Could not fetch Noobaa CR")
 		noobaaComponent.State = mcgv1alpha1.ComponentUnknown
 	}
+}
 
-	// Getting the status of the Prometheus component.
+// Getting the status of the Prometheus component.
+//nolint:dupl
+func (r *ManagedMCGReconciler) UpdatePrometheusComponentStatus() {
 	promStatus := &r.managedMCG.Status.Components.Prometheus
 	switch err := r.get(r.prometheus); {
 	case err == nil:
@@ -656,11 +676,7 @@ func (r *ManagedMCGReconciler) updateComponentStatus() {
 			if r.prometheus.Spec.Replicas != nil {
 				desiredReplicas = *r.prometheus.Spec.Replicas
 			}
-			if promStatefulSet.Status.ReadyReplicas != desiredReplicas {
-				promStatus.State = mcgv1alpha1.ComponentPending
-			} else {
-				promStatus.State = mcgv1alpha1.ComponentReady
-			}
+			promStatus.State = r.CheckReplicaStatus(promStatefulSet.Status.ReadyReplicas, desiredReplicas)
 		} else {
 			promStatus.State = mcgv1alpha1.ComponentPending
 		}
@@ -670,8 +686,11 @@ func (r *ManagedMCGReconciler) updateComponentStatus() {
 		r.Log.Info("error getting Prometheus, setting component status to Unknown")
 		promStatus.State = mcgv1alpha1.ComponentUnknown
 	}
+}
 
-	// Getting the status of the Alertmanager component.
+// Getting the status of the Alertmanager component.
+//nolint:dupl
+func (r *ManagedMCGReconciler) UpdateAlertmanagerComponentStatus() {
 	amStatus := &r.managedMCG.Status.Components.Alertmanager
 	switch err := r.get(r.alertmanager); {
 	case err == nil:
@@ -683,11 +702,7 @@ func (r *ManagedMCGReconciler) updateComponentStatus() {
 			if r.alertmanager.Spec.Replicas != nil {
 				desiredReplicas = *r.alertmanager.Spec.Replicas
 			}
-			if amStatefulSet.Status.ReadyReplicas != desiredReplicas {
-				amStatus.State = mcgv1alpha1.ComponentPending
-			} else {
-				amStatus.State = mcgv1alpha1.ComponentReady
-			}
+			amStatus.State = r.CheckReplicaStatus(amStatefulSet.Status.ReadyReplicas, desiredReplicas)
 		} else {
 			amStatus.State = mcgv1alpha1.ComponentPending
 		}
@@ -697,6 +712,37 @@ func (r *ManagedMCGReconciler) updateComponentStatus() {
 		r.Log.Info("error getting Alertmanager, setting component status to Unknown")
 		amStatus.State = mcgv1alpha1.ComponentUnknown
 	}
+}
+
+// Getting the status of the Console component.
+func (r *ManagedMCGReconciler) UpdateConsoleComponentStatus() {
+	r.Log.Info("updating the Console component status")
+	consoleStatus := &r.managedMCG.Status.Components.Console
+	switch err := r.get(r.console); {
+	case err == nil:
+		consoleDeployment := &appsv1.Deployment{}
+		consoleDeployment.Namespace = r.namespace
+		consoleDeployment.Name = mcgmsConsoleName
+		if err := r.get(consoleDeployment); err == nil {
+			desiredReplicas := int32(1)
+			consoleStatus.State = r.CheckReplicaStatus(consoleDeployment.Status.ReadyReplicas, desiredReplicas)
+		} else {
+			consoleStatus.State = mcgv1alpha1.ComponentPending
+		}
+	case errors.IsNotFound(err):
+		consoleStatus.State = mcgv1alpha1.ComponentNotFound
+	default:
+		r.Log.Info("error getting Console, setting component status to unknown")
+		consoleStatus.State = mcgv1alpha1.ComponentUnknown
+	}
+}
+
+func (r *ManagedMCGReconciler) CheckReplicaStatus(readyReplicas, desiredReplicas int32) mcgv1alpha1.ComponentState {
+	if readyReplicas < desiredReplicas {
+		return mcgv1alpha1.ComponentPending
+	}
+
+	return mcgv1alpha1.ComponentReady
 }
 
 func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
