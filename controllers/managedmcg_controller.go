@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -38,7 +37,6 @@ import (
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
 	consolev1alpha1 "github.com/openshift/api/console/v1alpha1"
-	openshiftv1 "github.com/openshift/api/network/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -67,7 +65,6 @@ const (
 	noobaaName                        = "noobaa"
 	prometheusProxyNetworkPolicyName  = "prometheus-proxy-rule"
 	prometheusServiceName             = "prometheus"
-	egressNetworkPolicyName           = "egress-rule"
 	ingressNetworkPolicyName          = "ingress-rule"
 	ObjectBucketClaimFinalizer        = "objectbucket.io/finalizer"
 	mcgmsConsoleName                  = "mcg-ms-console"
@@ -130,7 +127,6 @@ type ManagedMCGReconciler struct {
 	noobaaObjectBucketClaim *noobaav1alpha1.ObjectBucketClaim
 	noobaaBucketClass       *noobaav1alpha1.BucketClass
 
-	egressNetworkPolicy  *openshiftv1.EgressNetworkPolicy
 	ingressNetworkPolicy *netv1.NetworkPolicy
 	operatorConsole      *operatorv1.Console
 }
@@ -167,10 +163,6 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 
 	r.initializePrometheusReconciler()
 
-	r.egressNetworkPolicy = &openshiftv1.EgressNetworkPolicy{}
-	r.egressNetworkPolicy.Name = egressNetworkPolicyName
-	r.egressNetworkPolicy.Namespace = r.namespace
-
 	r.ingressNetworkPolicy = &netv1.NetworkPolicy{}
 	r.ingressNetworkPolicy.Name = ingressNetworkPolicyName
 	r.ingressNetworkPolicy.Namespace = r.namespace
@@ -194,7 +186,6 @@ func (r *ManagedMCGReconciler) initializeReconciler(req ctrl.Request) {
 //+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources=servicemonitors,verbs=get;list;watch;update;patch;create
 //+kubebuilder:rbac:groups="monitoring.coreos.com",namespace=system,resources={alertmanagers,prometheuses,alertmanagerconfigs},verbs=get;list;watch;create;update
 //+kubebuilder:rbac:groups="networking.k8s.io",namespace=system,resources=networkpolicies,verbs=create;get;list;watch;update
-//+kubebuilder:rbac:groups="network.openshift.io",namespace=system,resources=egressnetworkpolicies,verbs=create;get;list;watch;update
 //+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions/finalizers,verbs=update
 //+kubebuilder:rbac:groups=console.openshift.io,resources=consoleplugins,verbs=*
@@ -321,71 +312,9 @@ func (r *ManagedMCGReconciler) reconcileResources() error {
 	if err := r.reconcileAlertMonitoring(); err != nil {
 		return err
 	}
-	if err := r.reconcileEgressNetworkPolicy(); err != nil {
-		return err
-	}
 	if err := r.reconcileIngressNetworkPolicy(); err != nil {
 		return err
 	}
-
-	return nil
-}
-
-func (r *ManagedMCGReconciler) reconcileEgressNetworkPolicy() error {
-	r.Log.Info("creating or updating EgressNetworkPolicy")
-	_, err := ctrl.CreateOrUpdate(r.ctx, r.Client, r.egressNetworkPolicy, func() error {
-		if err := r.own(r.egressNetworkPolicy); err != nil {
-			return err
-		}
-		desired := templates.EgressNetworkPolicyTemplate.DeepCopy()
-
-		if r.deadMansSnitchSecret.UID == "" {
-			if err := r.get(r.deadMansSnitchSecret); err != nil {
-				return fmt.Errorf("unable to get deadMan's snitch secret: %w", err)
-			}
-		}
-		dmsURL := string(r.deadMansSnitchSecret.Data["SNITCH_URL"])
-		if dmsURL == "" {
-			return fmt.Errorf("DeadMan's Snitch secret does not contain a SNITCH_URL entry")
-		}
-		snitchURL, err := url.Parse(string(r.deadMansSnitchSecret.Data["SNITCH_URL"]))
-		if err != nil {
-			return fmt.Errorf("unable to parse dms url: %w", err)
-		}
-
-		if r.smtpSecret.UID == "" {
-			if err := r.get(r.smtpSecret); err != nil {
-				return fmt.Errorf("unable to get smtp secret: %w", err)
-			}
-		}
-		smtpHost := string(r.smtpSecret.Data["host"])
-		if smtpHost == "" {
-			return fmt.Errorf("smtp secret does not contain a host entry")
-		}
-
-		dmsEgressRule := openshiftv1.EgressNetworkPolicyRule{}
-		dmsEgressRule.To.DNSName = snitchURL.Hostname()
-		dmsEgressRule.Type = openshiftv1.EgressNetworkPolicyRuleAllow
-
-		smtpEgressRule := openshiftv1.EgressNetworkPolicyRule{}
-		smtpEgressRule.To.DNSName = smtpHost
-		smtpEgressRule.Type = openshiftv1.EgressNetworkPolicyRuleAllow
-
-		desired.Spec.Egress = append(
-			[]openshiftv1.EgressNetworkPolicyRule{
-				dmsEgressRule,
-				smtpEgressRule,
-			},
-			desired.Spec.Egress...,
-		)
-		r.egressNetworkPolicy.Spec = desired.Spec
-
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("failed to update egress network policy: %w", err)
-	}
-	r.Log.Info("egressNetworkPolicy applied successfully")
 
 	return nil
 }
@@ -844,7 +773,6 @@ func (r *ManagedMCGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// Watch owned resources
 		Owns(&v1.ConfigMap{}).
 		Owns(&v1.Service{}).
-		Owns(&openshiftv1.EgressNetworkPolicy{}).
 		Owns(&netv1.NetworkPolicy{}).
 		// Watch non-owned resources
 		Watches(
