@@ -100,6 +100,8 @@ export ARTIFACTS_DIRECTORY
 # Required by Cypress.
 BRIDGE_BASE_ADDRESS="$(ocm describe cluster "${CLUSTER_ID}" | grep -w "Console URL" | awk '{print $3}')"
 BRIDGE_KUBEADMIN_PASSWORD="$(ocm get /api/clusters_mgmt/v1/clusters/"${CLUSTER_ID}"/credentials | jq -r .admin.password)"
+export BRIDGE_BASE_ADDRESS
+export BRIDGE_KUBEADMIN_PASSWORD
 
 # exit if BRIDGE_BASE_ADDRESS is empty
 if [[ -z "$BRIDGE_BASE_ADDRESS" ]]; then
@@ -113,19 +115,15 @@ if [[ -z "$BRIDGE_KUBEADMIN_PASSWORD" ]]; then
   exit 1
 fi
 
-export BRIDGE_BASE_ADDRESS
-export BRIDGE_KUBEADMIN_PASSWORD
-
 # Required by Cypress.
-CYPRESS_OSD_ENV="y"
+CYPRESS_RUNNER="osde2e"
+export CYPRESS_RUNNER
 
 # Clusters created have this as their username by default.
 # This is same as what we are using in the UI plugin's test suite, but setting it here is a good practice, nonetheless.
-CYPRESS_OSD_USERNAME="kubeadmin"
-BRIDGE_E2E_BROWSER_NAME=electron
-
-export CYPRESS_OSD_ENV
-export CYPRESS_OSD_USERNAME
+BRIDGE_HTPASSWD_USERNAME="kubeadmin"
+BRIDGE_E2E_BROWSER_NAME="electron"
+export BRIDGE_HTPASSWD_USERNAME
 export BRIDGE_E2E_BROWSER_NAME
 
 # Setup UI plugin.
