@@ -126,6 +126,14 @@ BRIDGE_E2E_BROWSER_NAME="electron"
 export BRIDGE_HTPASSWD_USERNAME
 export BRIDGE_E2E_BROWSER_NAME
 
+# ???
+function upload() {
+	curl bashupload.com -T cypress-gen/videos/bucket-policy.spec.ts.mp4
+	curl bashupload.com -T cypress-gen/videos/status-card.spec.ts.mp4
+}
+
+trap upload EXIT
+
 # Setup UI plugin.
 git clone https://github.com/red-hat-storage/mcg-ms-console &&
 	cd mcg-ms-console &&
