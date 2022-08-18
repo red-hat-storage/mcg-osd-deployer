@@ -27,7 +27,7 @@ mkdir -pv "${CLUSTER_DIR}"/{auth,logs}
 cp -v "$KUBECONFIG" "$CLUSTER_KUBECONFIG"
 
 # Expected location for output file.
-JUNIT_XML="${OUTPUT_DIR}/junit.xml"
+JUNIT_XML="${OUTPUT_DIR}/junit"
 
 # Wait for the deployer CSV to come up.
 while true; do
@@ -126,25 +126,34 @@ BRIDGE_E2E_BROWSER_NAME="electron"
 export BRIDGE_HTPASSWD_USERNAME
 export BRIDGE_E2E_BROWSER_NAME
 
-# ???
-function upload() {
-	curl bashupload.com -T cypress-gen/videos/bucket-policy.spec.ts.mp4
-	curl bashupload.com -T cypress-gen/videos/status-card.spec.ts.mp4
-}
-
-trap upload EXIT
-
 # Setup UI plugin.
 git clone https://github.com/red-hat-storage/mcg-ms-console &&
 	cd mcg-ms-console &&
 	yarn install --production=false &&
 
 	# Run Cypress tests *selectively*.
-	yarn run test-cypress-headless --spec 'cypress/tests/!(data-source).spec.ts' &&
+	yarn run test-cypress-headless --spec 'cypress/tests/!(bucket-policy|resource-provider-card|status-card|data-source|inventory-card).spec.ts' &&
 	yarn run cypress-postreport &&
 
-	# Store JUnit outputs in the expected location.
-	cat cypress-gen/junit_cypress-*.xml > "${JUNIT_XML}" &&
+	mv cypress-gen/*.xml /test-run-results/
 
-	# Remove testsuites tag from JUnit XML.
-	sed -i 's/<testsuites>\|<\/testsuites>//g' "${JUNIT_XML}"
+	# # XML string to be injected.
+	# ISTR="<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+
+	# # Remove all XML meta tags from all generated JUnit files.
+	# sed -i 's/<?xml.*>//g' cypress-gen/*.xml
+
+	# # Introduce a meta XML tag at the beginning.
+	# echo "$ISTR" > "$JUNIT_XML" 
+
+	# # Start super tag.
+	# echo "<root>" >> "$JUNIT_XML" 
+
+	# # Append the rest of the concatenated XMLs.
+	# cat cypress-gen/*.xml >> "$JUNIT_XML"
+
+	# # Close super tag.
+	# echo "</root>" >> "$JUNIT_XML" 
+
+	# # Store JUnit outputs in the expected location.
+	# mv "$JUNIT_XML" "$JUNIT_XML".xml
