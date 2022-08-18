@@ -67,8 +67,7 @@ const (
 	alertSMTPFromAddrKey = "ALERT_SMTP_FROM_ADDR"
 	rhobsEndpoint        = "RHOBS_ENDPOINT"
 	rhssoTokenEndpoint   = "RH_SSO_TOKEN_ENDPOINT"
-	addonVariant         = "ADDON_VARIANT"     // qe, dev, production
-	addonEnvironment     = "ADDON_ENVIRONMENT" // stage, production
+	addonEnvironment     = "ADDON_ENVIRONMENT"
 )
 
 func init() {
@@ -138,7 +137,7 @@ func main() {
 		RHOBSEndpoint:                envMap[rhobsEndpoint],
 		RHSSOTokenEndpoint:           envMap[rhssoTokenEndpoint],
 		AddonEnvironment:             envMap[addonEnvironment],
-		AddonVariant:                 envMap[addonVariant],
+		AddonVariant:                 envMap[addonName],
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ManagedMCG")
 		os.Exit(1)
@@ -163,7 +162,6 @@ func setupEnvMap() (map[string]string, error) {
 		alertSMTPFromAddrKey: "",
 		rhobsEndpoint:        "",
 		rhssoTokenEndpoint:   "",
-		addonVariant:         "",
 		addonEnvironment:     "",
 	}
 	for key := range envMap {
