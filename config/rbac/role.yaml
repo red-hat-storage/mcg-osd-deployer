@@ -195,8 +195,6 @@ rules:
   - watch
 - apiGroups:
   - network.openshift.io
-  resources:
-  - egressnetworkpolicies
   verbs:
   - create
   - get

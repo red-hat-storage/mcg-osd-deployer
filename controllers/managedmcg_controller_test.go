@@ -209,15 +209,6 @@ func newMcgCsvFake() opv1a1.ClusterServiceVersion {
 	}
 }
 
-func newEgressNetworkPolicy() openshiftv1.EgressNetworkPolicy {
-	return openshiftv1.EgressNetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "Egress-rule",
-			Namespace: namespace,
-		},
-	}
-}
-
 func newIngressNetworkPolicy() netv1.NetworkPolicy {
 	return netv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
@@ -263,7 +254,6 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 	rhobsSecretFake := newRHOBSSecretFake()
 	consoleDepFake := newConsoleDeploymentFake()
 	mcgcsvFake := newMcgCsvFake()
-	egressNetworkPolicy := newEgressNetworkPolicy()
 	ingressNetworkPolicy := newIngressNetworkPolicy()
 	newFakeBucketClass := newFakeBucketClass()
 
@@ -283,7 +273,7 @@ func TestManagedMCGReconcilerReconcile(t *testing.T) {
 
 	fakeClient := fake.NewClientBuilder().WithScheme(r.Scheme).WithObjects(&ocscsvFake,
 		&smtpsecretfake, &addonsecretFake, &deadmansercretFake, &pagerdutysecretFake, &rhobsSecretFake,
-		&managedMCGFake, &consoleDepFake, &mcgcsvFake, &egressNetworkPolicy, &ingressNetworkPolicy,
+		&managedMCGFake, &consoleDepFake, &mcgcsvFake, &ingressNetworkPolicy,
 		&newFakeBucketClass).Build()
 
 	r.Client = fakeClient
