@@ -332,14 +332,6 @@ spec:
           - update
           - watch
         - apiGroups:
-          - network.openshift.io
-          verbs:
-          - create
-          - get
-          - list
-          - update
-          - watch
-        - apiGroups:
           - networking.k8s.io
           resources:
           - networkpolicies
