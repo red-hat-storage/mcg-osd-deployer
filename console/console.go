@@ -17,8 +17,6 @@ limitations under the License.
 package console
 
 import (
-	"strings"
-
 	"github.com/red-hat-storage/mcg-osd-deployer/templates"
 
 	consolev1alpha1 "github.com/openshift/api/console/v1alpha1"
@@ -29,8 +27,7 @@ import (
 )
 
 const (
-	mainBasePath          = "/"
-	compatibilityBasePath = "/compatibility/"
+	mainBasePath = "/"
 )
 
 var tlsService = "prometheus"
@@ -102,10 +99,6 @@ func GetConsolePluginCR(consolePort int, basePath string, serviceNamespace strin
 	}
 }
 
-func GetBasePath(clusterVersion string) string {
-	if strings.Contains(clusterVersion, "4.11") {
-		return compatibilityBasePath
-	}
-
+func GetBasePath() string {
 	return mainBasePath
 }

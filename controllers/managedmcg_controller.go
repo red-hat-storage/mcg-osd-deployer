@@ -35,7 +35,6 @@ import (
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/go-logr/logr"
-	configv1 "github.com/openshift/api/config/v1"
 	consolev1alpha1 "github.com/openshift/api/console/v1alpha1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	opv1a1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -915,16 +914,11 @@ func (r *ManagedMCGReconciler) reconcileConsoleCluster() error {
 }
 
 func (r *ManagedMCGReconciler) ensureConsolePlugin() error {
-	clusterVersion, err := r.determineOpenShiftVersion()
-	if err != nil {
-		return fmt.Errorf("failed to get the cluster version, %w", err)
-	}
-
 	// The base path to where the plugin's assets are stored. ex: plugin-manifest.json
-	basePath := console.GetBasePath(clusterVersion)
+	basePath := console.GetBasePath()
 	// Get mcg console Deployment
 	mcgConsoleDeployment := console.GetDeployment(r.namespace)
-	err = r.Client.Get(r.ctx, types.NamespacedName{
+	err := r.Client.Get(r.ctx, types.NamespacedName{
 		Name:      mcgConsoleDeployment.Name,
 		Namespace: mcgConsoleDeployment.Namespace,
 	}, mcgConsoleDeployment)
@@ -958,17 +952,4 @@ func (r *ManagedMCGReconciler) ensureConsolePlugin() error {
 	}
 
 	return nil
-}
-
-func (r *ManagedMCGReconciler) determineOpenShiftVersion() (string, error) {
-	clusterVersionList := configv1.ClusterVersionList{}
-	if err := r.Client.List(r.ctx, &clusterVersionList); err != nil {
-		return "", fmt.Errorf("failed to get the clusterversion, %w", err)
-	}
-	clusterVersion := ""
-	for _, version := range clusterVersionList.Items {
-		clusterVersion = version.Status.Desired.Version
-	}
-
-	return clusterVersion, nil
 }
