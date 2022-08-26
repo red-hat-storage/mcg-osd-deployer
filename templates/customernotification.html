@@ -7,44 +7,25 @@
     <p>
         Hello!
         <br><br>
-        This notification is for your OpenShift managed cluster running OpenShift Data Federation.
+        This notification is for your OpenShift managed cluster running Red Hat Data Access Service.
         <br><br>
         <strong>
-            {{ range .Alerts.Firing }}
-            {{ range .Labels.SortedPairs }}
-                {{ if eq .Name "alertname" }}
-                    {{ if eq .Value "NooBaaBucketReachingQuotaState" }}
-                        A NooBaa bucket is using morethan 80% of its quota
-                    {{ end }}
-                    {{ if eq .Value "NooBaaBucketExceedingQuotaState" }}
-                        A NooBaa bucket is exceeding its quota - 100% used
-                    {{ end }}
-                    {{ if eq .Value "NooBaaBucketLowCapacityState" }}
-                        A NooBaa bucket is using 80% of its capacity
-                    {{ end }}
-                    {{ if eq .Value "NooBaaBucketNoCapacityState" }}
-                        A NooBaa bucket is using all of its capacity
-                    {{ end }}
-                    {{ if eq .Value "NooBaaSystemCapacityWarning85" }}
-                        A NooBaa system is approaching its capacity, usage is more than 85%
-                    {{ end }}
-                    {{ if eq .Value "NooBaaSystemCapacityWarning95" }}
-                        A NooBaa system is approaching its capacity, usage is more than 95%
-                    {{ end }}
-                    {{ if eq .Value "NooBaaSystemCapacityWarning100" }}
-                        A NooBaa system approached its capacity, usage is at 100%
-                    {{ end }}
-                        <br>
-                {{ end }}
+        {{ with (index .Alerts.Firing 0).Labels }}
+            {{ if eq .alertname "DataSourceErrorState" }}
+                Data Source {{ .namespace_resource_name }} in error state
             {{ end }}
+            {{ if eq .alertname "BucketPolicyErrorState" }}
+                Bucket Policy {{ .bucket_name }} in error state
+            {{ end }}
+            <br>
         {{ end }}
         </strong>
         <br>
         If you have any questions, please <a clicktracking=off href="https://access.redhat.com/support/contact/technicalSupport/">contact us</a>. Review the <a clicktracking=off href="https://access.redhat.com/support/policy/support_process">support process</a> for guidance on working with Red Hat support.
         <br><br>
-        Thank you for choosing Red Hat OpenShift Data Foundation,
+        Thank you for choosing Red Hat Data Access Service,
         <br>
-        ODF SRE
+        Data Access Service Team
     </p>
 </body>
 </html>
