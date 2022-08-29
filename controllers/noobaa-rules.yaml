@@ -7,49 +7,49 @@
        - expr: |
            max(NooBaa_num_unhealthy_bucket_claims{namespace="redhat-data-federation"})
          labels:
-           origin: data-federation-service
+           origin: data-access-service
          record: namespace:noobaa_unhealthy_bucket_claims:max
        - expr: |
            max(NooBaa_num_buckets_claims{namespace="redhat-data-federation"})
          labels:
-           origin: data-federation-service
+           origin: data-access-service
          record: namespace:noobaa_buckets_claims:max
        - expr: |
            max(NooBaa_num_unhealthy_namespace_resources{namespace="redhat-data-federation"})
          labels:
-           origin: data-federation-service
+           origin: data-access-service
          record: namespace:noobaa_unhealthy_namespace_resources:max
        - expr: |
            max(NooBaa_num_namespace_resources{namespace="redhat-data-federation"})
          labels:
-           origin: data-federation-service
+           origin: data-access-service
          record: namespace:noobaa_namespace_resources:max
        - expr: |
            max(NooBaa_num_unhealthy_namespace_buckets{namespace="redhat-data-federation"})
          labels:
-           origin: data-federation-service
+           origin: data-access-service
          record: namespace:noobaa_unhealthy_namespace_buckets:max
        - expr: |
            max(NooBaa_num_namespace_buckets{namespace="redhat-data-federation"})
          labels:
-           origin: data-federation-service
+           origin: data-access-service
          record: namespace:noobaa_namespace_buckets:max
        - expr: |
            max(NooBaa_accounts_num{namespace="redhat-data-federation"})
          labels:
-           origin: data-federation-service
+           origin: data-access-service
          record: namespace:noobaa_accounts:max
        - expr: |
            max(NooBaa_total_usage{namespace="redhat-data-federation"})
          labels:
-           origin: data-federation-service
+           origin: data-access-service
          record: namespace:noobaa_usage:max
    - name: noobaa-internal.rules
      rules:
        - expr: |
            max(NooBaa_odf_health_status{namespace="redhat-data-federation"})
          labels:
-           origin: data-federation-service
+           origin: data-access-service
          record: namespace:noobaa_system_health_status:max
    - name: bucket-state-alert.rules
      rules:
@@ -62,7 +62,7 @@
          for: 5m
          labels:
            severity: warning
-           origin: data-federation-service
+           origin: data-access-service
    - name: resource-state-alert.rules
      rules:
        - alert: CacheBucketErrorState
@@ -74,7 +74,7 @@
          for: 5m
          labels:
            severity: warning
-           origin: data-federation-service
+           origin: data-access-service
        - alert: DataSourceErrorState
          annotations:
            description: A Data Source {{ $labels.namespace_resource_name }} is in error state for more than 5m
@@ -84,4 +84,4 @@
          for: 5m
          labels:
            severity: warning
-           origin: data-federation-service
+           origin: data-access-service
