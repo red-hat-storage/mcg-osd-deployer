@@ -137,7 +137,7 @@ func main() {
 		RHOBSEndpoint:                envMap[rhobsEndpoint],
 		RHSSOTokenEndpoint:           envMap[rhssoTokenEndpoint],
 		AddonEnvironment:             envMap[addonEnvironment],
-		AddonVariant:                 envMap[addonName],
+		AddonVariant:                 addonName,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ManagedMCG")
 		os.Exit(1)
