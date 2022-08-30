@@ -51,6 +51,13 @@ spec:
                     required:
                     - state
                     type: object
+                  console:
+                    properties:
+                      state:
+                        type: string
+                    required:
+                    - state
+                    type: object
                   noobaa:
                     properties:
                       state:
@@ -65,18 +72,11 @@ spec:
                     required:
                     - state
                     type: object
-                  console:
-                    properties:
-                      state:
-                        type: string
-                    required:
-                    - state
-                    type: object
                 required:
                 - alertmanager
+                - console
                 - noobaa
                 - prometheus
-                - console
                 type: object
               reconcileStrategy:
                 type: string

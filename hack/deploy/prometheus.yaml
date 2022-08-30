@@ -5,6 +5,6 @@ metadata:
   namespace: redhat-data-federation
 spec:
   displayName: downstream-prometheus-operator
-  image: quay.io/dbindra/ose-prometheus-operator:4.10.0_catsrc
+  image: quay.io/dbindra/ose-prometheus-operator:4.11.0_cat_src_wo_replaces
   publisher: RedHat
   sourceType: grpc

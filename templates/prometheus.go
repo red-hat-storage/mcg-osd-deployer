@@ -143,7 +143,8 @@ var PrometheusTemplate = promv1.Prometheus{
 		Alerting: &promv1.AlertingSpec{
 			Alertmanagers: []promv1.AlertmanagerEndpoints{
 				{
-					Namespace: "", Name: "alertmanager-operated",
+					Namespace: "", 
+					Name: "alertmanager-operated",
 					Port: intstr.FromString("web"),
 				},
 			},

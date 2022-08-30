@@ -57,5 +57,9 @@ var NoobaaTemplate = &noobaa.NooBaa{
 				},
 			},
 		},
+		CleanupPolicy: noobaa.CleanupPolicySpec{
+			AllowNoobaaDeletion: true,
+			Confirmation:        "confirmed",
+		},
 	},
 }
