@@ -24,6 +24,23 @@ spec:
           ports:
             - containerPort: 9002
               protocol: TCP
+          livenessProbe:
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            tcpSocket:
+              port: 9002
+          readinessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            tcpSocket:
+              port: 9002
+                    resources:
+          limits:
+            cpu: 250m
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
           volumeMounts:
             - name: mcg-ms-console-serving-cert
               mountPath: /var/serving-cert

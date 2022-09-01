@@ -38,6 +38,11 @@ spec:
               port: 8081
             initialDelaySeconds: 5
             periodSeconds: 10
+          livenessProbe:
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            tcpSocket:
+              port: 8081
           resources:
             limits:
               cpu: 100m
@@ -56,6 +61,16 @@ spec:
             - --enable-leader-election
           image: controller:latest
           name: manager
+          livenessProbe:
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            tcpSocket:
+              port: 8443
+          readinessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            tcpSocket:
+              port: 8443
           resources:
             limits:
               cpu: 100m
