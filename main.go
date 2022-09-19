@@ -37,6 +37,7 @@ import (
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	obv1 "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
@@ -68,6 +69,7 @@ const (
 	rhobsEndpoint        = "RHOBS_ENDPOINT"
 	rhssoTokenEndpoint   = "RH_SSO_TOKEN_ENDPOINT"
 	addonEnvironment     = "ADDON_ENVIRONMENT"
+	healthProbePort      = ":8082"
 )
 
 func init() {
@@ -107,12 +109,13 @@ func main() {
 		os.Exit(1)
 	}
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
-		Port:               9443,
-		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "af4bf43b.openshift.io",
-		Namespace:          envMap[namespaceKey],
+		Scheme:                 scheme,
+		MetricsBindAddress:     metricsAddr,
+		Port:                   9443,
+		LeaderElection:         enableLeaderElection,
+		LeaderElectionID:       "af4bf43b.openshift.io",
+		Namespace:              envMap[namespaceKey],
+		HealthProbeBindAddress: healthProbePort,
 	})
 	if err != nil {
 		setupLog.Error(err, "failed to start manager")
@@ -146,6 +149,12 @@ func main() {
 
 	if err := ensureManagedMCG(mgr.GetClient(), setupLog, envMap); err != nil {
 		os.Exit(1)
+	}
+	if err := mgr.AddHealthzCheck("health", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up health check")
+	}
+	if err := mgr.AddReadyzCheck("check", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up ready check")
 	}
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

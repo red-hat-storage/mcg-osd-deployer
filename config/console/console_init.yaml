@@ -21,9 +21,22 @@ spec:
             limits:
               cpu: "100m"
               memory: "512Mi"
+            requests:
+              cpu: "100m"
+              memory: "512Mi"
           ports:
             - containerPort: 9002
               protocol: TCP
+          livenessProbe:
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            tcpSocket:
+              port: 9002
+          readinessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            tcpSocket:
+              port: 9002
           volumeMounts:
             - name: mcg-ms-console-serving-cert
               mountPath: /var/serving-cert
