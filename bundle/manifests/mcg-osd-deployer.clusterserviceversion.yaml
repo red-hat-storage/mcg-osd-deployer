@@ -148,16 +148,18 @@ spec:
                       fieldPath: metadata.namespace
                 image: quay.io/osd-addons/mcg-osd:0.1.0
                 livenessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 8082
                   initialDelaySeconds: 15
                   periodSeconds: 20
-                  tcpSocket:
-                    port: 8081
                 name: manager
                 readinessProbe:
+                  httpGet:
+                    path: /readyz
+                    port: 8082
                   initialDelaySeconds: 5
                   periodSeconds: 10
-                  tcpSocket:
-                    port: 8081
                 resources:
                   limits:
                     cpu: 100m

@@ -62,15 +62,17 @@ spec:
           image: controller:latest
           name: manager
           livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8082
             initialDelaySeconds: 15
             periodSeconds: 20
-            tcpSocket:
-              port: 8081
           readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8082
             initialDelaySeconds: 5
             periodSeconds: 10
-            tcpSocket:
-              port: 8081
           resources:
             limits:
               cpu: 100m
